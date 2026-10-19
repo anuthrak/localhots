@@ -1,0 +1,25 @@
+# Model, data and anything not cleared for public release
+private/
+*.pem
+*.joblib
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Node / Vercel
+node_modules/
+.vercel/
+dist/
+build/
+
+# OS / editors
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+.env
+.env.*
