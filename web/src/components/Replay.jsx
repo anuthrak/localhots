@@ -4,7 +4,8 @@ import SeasonStrip from "./SeasonStrip.jsx";
 import DayPanel from "./DayPanel.jsx";
 import { fmtDay, getJSON } from "../lib.js";
 
-export default function Replay({ ov }) {
+// api: folder of day files; expand: turns a day file into per-cell objects (the main API already sends them).
+export default function Replay({ ov, api = "api", expand = (d) => d }) {
   const dates = ov.timeline.dates;
   // Busiest days (by fires discovered) as quick jumps.
   const busiest = useMemo(() => dates.map((d, i) => ({ d, f: ov.timeline.fires[i] }))
@@ -23,7 +24,7 @@ export default function Replay({ ov }) {
   useEffect(() => {
     let current = true;
     const cached = cache.current.get(date);
-    (cached ? Promise.resolve(cached) : getJSON(`api/day/${date}.json`)).then((d) => {
+    (cached ? Promise.resolve(cached) : getJSON(`${api}/day/${date}.json`).then((raw) => expand(raw))).then((d) => {
       cache.current.set(date, d);
       if (cache.current.size > 400) cache.current.delete(cache.current.keys().next().value);
       if (current) setDay(d);
@@ -56,6 +57,7 @@ export default function Replay({ ov }) {
 
   const select = useCallback((id) => setSelected((s) => (s === id ? null : id)), []);
   const jump = (d) => { setPlaying(false); setDate(d); };
+  const k = ov.metrics.review_k, badges = ov.metrics.badge_k ?? k;
 
   return (
     <section id="replay" className="section">
@@ -63,7 +65,9 @@ export default function Replay({ ov }) {
         <div className="section-head">
           <p className="eyebrow">Replay map</p>
           <h2>Pick a day. See where it said to look.</h2>
-          <p className="muted">The glow shows the model's risk, issued the evening before. Numbered badges are the top 3 areas a crew would check. Dots are the fires actually discovered that day.</p>
+          <p className="muted">The glow shows the model's risk, issued the evening before. {badges === k
+            ? `Numbered badges are the top ${k} areas a crew would check.`
+            : `Numbered badges are the top ${badges} of the ${k} cells a crew would check.`} Dots are the fires actually discovered that day.</p>
         </div>
 
         <div className="controls card">
@@ -97,10 +101,10 @@ export default function Replay({ ov }) {
             <div className="legend">
               <span className="ramp-wrap">Lower risk <i className="ramp"></i> Higher risk</span>
               <span><i className="fire-dot"></i>Actual fire</span>
-              <span><i className="rank-mini">1</i>Top 3 picks</span>
+              <span><i className="rank-mini">1</i>Top {badges} picks</span>
               <span><i className="fade-swatch"></i>Faded = outside model area</span>
             </div>
-            <SeasonStrip timeline={ov.timeline} date={date} onPick={jump} />
+            <SeasonStrip timeline={ov.timeline} date={date} onPick={jump} k={k} />
           </div>
           <DayPanel ov={ov} day={day} selected={selected} onSelect={select} />
         </div>

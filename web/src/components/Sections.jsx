@@ -2,23 +2,28 @@ import { useMemo } from "react";
 import ChartBox, { grid } from "./ChartBox.jsx";
 import { nf, pct } from "../lib.js";
 
-export function Nav({ ov, error }) {
+const HOME_LINKS = [
+  ["#replay", "Replay map"], ["#how", "How it works"], ["#results", "Results"], ["#linuxone", "LinuxONE"],
+  ["#forecast", "Live forecast"],
+];
+const HOME_CTA = [`${import.meta.env.BASE_URL}norcal/`, "Detailed map"];
+
+// links: [href, label] pairs; cta: the button at the far right, to the other page; chip: status text once
+// the data has loaded (defaults to the server's).
+export function Nav({ ov, error, links = HOME_LINKS, cta = HOME_CTA, chip }) {
   const r = ov?.runtime;
   return (
     <header className="nav">
       <div className="wrap nav-inner">
         <a href="#top" className="logo"><span className="flame" aria-hidden="true"></span>localhots</a>
         <nav aria-label="Sections">
-          <a href="#replay">Replay map</a>
-          <a href="#how">How it works</a>
-          <a href="#results">Results</a>
-          <a href="#linuxone">LinuxONE</a>
-          <a href="#forecast">Live forecast</a>
+          {links.map(([href, label]) => <a key={href} href={href}>{label}</a>)}
         </nav>
         <span className={`chip chip-live${r ? " ok" : ""}`}>
           <span className="dot"></span>
-          {error ? "Data unavailable" : !r ? "Connecting…" : r.snapshot ? `Built on IBM LinuxONE · ${r.machine}` : `Live server · ${r.machine}`}
+          {error ? "Data unavailable" : !r ? "Connecting…" : chip ?? (r.snapshot ? `Built on IBM LinuxONE · ${r.machine}` : `Live server · ${r.machine}`)}
         </span>
+        <a href={cta[0]} className="btn btn-primary nav-cta">{cta[1]}</a>
       </div>
     </header>
   );
@@ -260,12 +265,14 @@ export function Limits() {
   );
 }
 
-export function Footer() {
+const SOURCES = "Fire data: US Forest Service, Fire Program Analysis Fire-Occurrence Database (FPA FOD), 7th edition. Weather: Open-Meteo / Copernicus ERA5, CC BY 4.0. Map tiles © OpenStreetMap contributors. Research model, not an official warning service.";
+
+export function Footer({ sources = SOURCES }) {
   return (
     <footer className="footer">
       <div className="wrap">
         <p><b>localhots</b> · built at IBM Z Datathon 2026</p>
-        <p className="tiny">Fire data: US Forest Service, Fire Program Analysis Fire-Occurrence Database (FPA FOD), 7th edition. Weather: Open-Meteo / Copernicus ERA5, CC BY 4.0. Map tiles © OpenStreetMap contributors. Research model, not an official warning service.</p>
+        <p className="tiny">{sources}</p>
       </div>
     </footer>
   );

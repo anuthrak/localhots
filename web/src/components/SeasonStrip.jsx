@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 
-// One bar per day of the selected date's year: fires discovered, orange when the top 3 caught one.
-export default function SeasonStrip({ timeline: t, date, onPick }) {
+// One bar per day of the selected date's year: fires discovered, orange when the top k caught one.
+export default function SeasonStrip({ timeline: t, date, onPick, k = 3 }) {
   const year = date.slice(0, 4);
   const idx = useMemo(() => t.dates.map((d, i) => (d.startsWith(year) ? i : -1)).filter((i) => i >= 0), [t, year]);
   const max = Math.max(...idx.map((i) => t.fires[i]), 1);
@@ -18,7 +18,7 @@ export default function SeasonStrip({ timeline: t, date, onPick }) {
     <div className="card strip-card">
       <div className="strip-head">
         <span className="small"><b>{year}</b> · fires discovered per day</span>
-        <span className="small muted"><i className="sw sw-hit"></i>top 3 caught a fire <i className="sw sw-miss"></i>missed</span>
+        <span className="small muted"><i className="sw sw-hit"></i>top {k} caught a fire <i className="sw sw-miss"></i>missed</span>
       </div>
       <svg className="strip" viewBox={`0 0 ${idx.length} 100`} preserveAspectRatio="none" role="img" aria-label="Fires per day this year; click to jump" onClick={pick}>
         {idx.map((i, x) => {

@@ -60,6 +60,7 @@ b { font-weight: 600; }
 .nav nav { display: flex; gap: 4px; margin-left: auto; }
 .nav nav a { text-decoration: none; font-size: 14px; color: var(--ash); padding: 6px 10px; border-radius: var(--r-btn); }
 .nav nav a:hover { color: var(--ink); background: var(--pearl); }
+.nav-cta { padding: 7px 14px; font-size: 14px; white-space: nowrap; margin-left: -12px; }
 
 .chip { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; padding: 4px 10px; border-radius: 999px; white-space: nowrap; }
 .chip-live { background: var(--cream); border: 1px solid var(--hairline); }
@@ -264,6 +265,8 @@ b { font-weight: 600; }
 @media (max-width: 640px) {
   .wrap { padding: 0 16px; }
   .split, .steps, .metric-grid, .run-grid, .limits { grid-template-columns: 1fr; }
+  .chip-live { display: none; } /* no room beside the button on phones */
+  .nav-cta { margin-left: auto; }
   .hero { padding: 48px 0 40px; }
   .hero-stats { margin-top: 36px; }
   .hero-stats dd { font-size: 21px; }

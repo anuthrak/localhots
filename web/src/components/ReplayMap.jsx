@@ -23,7 +23,7 @@ export default function ReplayMap({ ov, day, selected, onSelect, duration }) {
 
     const g = gridFor(ov.cells);
     const outer = L.latLngBounds([g.s0, g.w0], [g.s0 + g.span, g.w0 + g.span]);
-    const heat = createHeat(g);
+    const heat = createHeat(g, ov.metrics.heat_scale ?? 1);
     // svgOverlay places any element over the bounds, so the canvas is drawn on directly each frame
     // (no PNG encode/decode as with an image overlay).
     L.svgOverlay(heat.canvas, outer, { interactive: false, className: "heat" }).addTo(map);
@@ -45,7 +45,7 @@ export default function ReplayMap({ ov, day, selected, onSelect, duration }) {
         .addTo(map);
     }
 
-    // Lock the view: can't zoom out past the region or pan away from Northern California.
+    // Lock the view: can't zoom out past the region or pan away from it.
     const lock = () => {
       map.invalidateSize();
       const z = map.getBoundsZoom(outer, false);
@@ -73,10 +73,11 @@ export default function ReplayMap({ ov, day, selected, onSelect, duration }) {
     s.badges.clearLayers();
     s.fires.clearLayers();
     animateHeat(s, Object.fromEntries(day.cells.map((c) => [c.id, c.score])), latest.current.duration);
+    const badges = ov.metrics.badge_k ?? ov.metrics.review_k;
     for (const c of day.cells) {
       s.outline(c.id);
-      s.rects[c.id].setTooltipContent(`<b>${name(c.id)}</b><br>Rank ${c.rank} of 24 · score ${c.score.toFixed(2)}${c.fires ? `<br>${fires(c.fires)} discovered` : ""}`);
-      if (c.rank <= ov.metrics.review_k) {
+      s.rects[c.id].setTooltipContent(`<b>${name(c.id)}</b><br>Rank ${c.rank} of ${ov.cells.length} · score ${c.score.toFixed(2)}${c.fires ? `<br>${fires(c.fires)} discovered` : ""}`);
+      if (c.rank <= badges) {
         L.marker(s.rects[c.id].getBounds().getCenter(), {
           interactive: false,
           icon: L.divIcon({ className: "", html: `<span class="rank-badge">${c.rank}</span>`, iconSize: [26, 26], iconAnchor: [13, 13] }),
@@ -88,7 +89,7 @@ export default function ReplayMap({ ov, day, selected, onSelect, duration }) {
     }
   }, [ov, day, selected]);
 
-  return <div id="map" ref={el} className="card map" role="img" aria-label="Map of the 24 forecast areas" />;
+  return <div id="map" ref={el} className="card map" role="img" aria-label={`Map of the ${ov.cells.length} forecast areas`} />;
 }
 
 // Ease from the scores on screen to the new day's scores.

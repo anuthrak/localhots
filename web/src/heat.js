@@ -9,7 +9,7 @@ const HEAT = [
   [0.45, 175, 30, 0, 0.66],
   [0.75, 120, 20, 0, 0.74],
 ];
-export const VIEW_CELLS = 8; // the view spans 8 x 8 cells with the modelled 4 x 6 area in the middle
+const VIEW_MARGIN = 2; // the view is a square one cell wider than the modelled area on each side (8 x 8 for 4 x 6)
 const CANVAS_PX = 256;
 export const WASH = 0.8; // white wash strength over everything the model doesn't cover
 
@@ -29,7 +29,8 @@ function heatColor(v) {
 const HEAT_LUT = Array.from({ length: 256 }, (_, i) => heatColor(i / 255)); // ramp sampled once
 const NO_HEAT = [0, 0, 0, 0];
 
-// Grid geometry from the area bounds: the modelled block centred in a VIEW_CELLS-wide square.
+// Grid geometry from the area bounds: the modelled block centred in a square view. Cells missing from
+// the list (over the ocean) simply get no heat.
 export function gridFor(cells) {
   const south = Math.min(...cells.map((c) => c.bounds[0][0]));
   const west = Math.min(...cells.map((c) => c.bounds[0][1]));
@@ -37,9 +38,10 @@ export function gridFor(cells) {
   const east = Math.max(...cells.map((c) => c.bounds[1][1]));
   const step = cells[0].bounds[1][0] - cells[0].bounds[0][0];
   const rows = Math.round((north - south) / step), cols = Math.round((east - west) / step);
-  const s0 = south - Math.floor((VIEW_CELLS - rows) / 2) * step;
-  const w0 = west - Math.floor((VIEW_CELLS - cols) / 2) * step;
-  return { south, west, north, east, step, rows, cols, s0, w0, span: VIEW_CELLS * step };
+  const view = Math.max(rows, cols) + VIEW_MARGIN;
+  const s0 = south - Math.floor((view - rows) / 2) * step;
+  const w0 = west - Math.floor((view - cols) / 2) * step;
+  return { south, west, north, east, step, rows, cols, s0, w0, span: view * step };
 }
 
 // Per-pixel geometry for the heat canvas, worked out once: which 2 x 2 block of area centres each
@@ -47,7 +49,7 @@ export function gridFor(cells) {
 // the modelled area. Drawing a frame then only has to mix scores.
 function prepareHeat(g) {
   const N = CANVAS_PX;
-  const px = { cell: new Uint8Array(N * N), tr: new Float32Array(N * N), tc: new Float32Array(N * N),
+  const px = { cell: new Uint16Array(N * N), tr: new Float32Array(N * N), tc: new Float32Array(N * N),
     fade: new Float32Array(N * N), wash: new Float32Array(N * N) };
   for (let y = 0; y < N; y++) {
     const lat = g.s0 + g.span - ((y + 0.5) / N) * g.span;
@@ -73,7 +75,9 @@ function prepareHeat(g) {
 // Returns the canvas and a draw(scores) that paints scores as a smooth surface: bilinear blend
 // between area centres, softly fading out past the modelled area, with a white wash over everything
 // the model doesn't cover. Missing scores are left out of the blend (never treated as zero risk).
-export function createHeat(g) {
+// scale stretches scores onto the colour ramp, so finer grids (lower fire rates) use the same colours
+// for the same relative risk.
+export function createHeat(g, scale = 1) {
   const canvas = document.createElement("canvas");
   canvas.width = canvas.height = CANVAS_PX;
   const ctx = canvas.getContext("2d");
@@ -85,7 +89,7 @@ export function createHeat(g) {
     const vals = new Float64Array(g.rows * g.cols).fill(NaN);
     for (let r = 0; r < g.rows; r++) for (let c = 0; c < g.cols; c++) {
       const s = scores[`r${r}c${c}`];
-      if (Number.isFinite(s)) vals[r * g.cols + c] = s;
+      if (Number.isFinite(s)) vals[r * g.cols + c] = s * scale;
     }
     for (let p = 0, i = 0; p < px.cell.length; p++, i += 4) {
       const k = px.cell[p], tr = px.tr[p], tc = px.tc[p];
