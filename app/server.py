@@ -33,7 +33,7 @@ HOST = os.environ.get("HOST", "0.0.0.0")
 REVIEW_K = 3  # cells a crew checks per day
 
 sys.path.insert(0, str(PROJECT / "model"))
-from predict import ANOMALIES, BASE_FEATURES, infer  # noqa: E402  (teammate's retained runtime)
+from predict import ANOMALIES, BASE_FEATURES, infer  # noqa: E402  (the team's retained runtime)
 
 # Grid definition from REPORT.md section 2.2.
 LAT0, LON0, STEP = 38.5, -123.0, 0.5
@@ -112,7 +112,7 @@ class Outlook:
         bench = data[data.target_date > cutoff].sort_values(["target_date", "cell_id"]).reset_index(drop=True)
         load_ms = (time.perf_counter() - t0) * 1000
 
-        # Score every replay day with the teammate's own infer(), then check our feature copy matches it.
+        # Score every replay day with the team's own infer(), then check our feature copy matches it.
         t1 = time.perf_counter()
         bench["score"] = infer(self.bundle, bench)
         score_ms = (time.perf_counter() - t1) * 1000

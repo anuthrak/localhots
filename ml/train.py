@@ -173,7 +173,7 @@ def main() -> None:
 
     if args.compare:
         sys.path.insert(0, str(args.data / "model"))
-        from predict import infer  # teammate's runtime
+        from predict import infer  # the team's original runtime
         original = joblib.load(args.data / "model/model.joblib")
         diff = np.abs(infer(original, test.drop(columns=["year", "month"])) - score).max()
         log(f"max |score difference| vs original on {len(test):,} test rows: {diff:.3g}")
