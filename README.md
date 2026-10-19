@@ -23,6 +23,7 @@ Results on the 2022–2024 test years: average precision 0.438 (random: 0.119), 
 |---|---|
 | `app/server.py` | API + static file server (`/api/overview`, `/api/day?date=YYYY-MM-DD`, `/api/health`) |
 | `app/static/` | The website |
+| `ml/train.py` | Rebuilds the model from the dataset; reproduces the original scores exactly (`--compare`) |
 | `deploy/linuxone/run.sh` | How it ran on LinuxONE during the datathon |
 | `design.md` | Page plan, API and visual style |
 
