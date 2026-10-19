@@ -83,22 +83,22 @@ b { font-weight: 600; }
 
 /* Hero */
 .hero {
-  padding: 24px 0 20px;
+  padding: 72px 0 64px;
   background:
     radial-gradient(1100px 520px at 85% -10%, rgba(232, 64, 13, 0.55), transparent 60%),
     radial-gradient(900px 500px at 100% 60%, rgba(208, 178, 255, 0.55), transparent 60%),
     linear-gradient(180deg, #ffeed8 0%, #fff7ee 55%, var(--canvas) 100%);
 }
 .display {
-  font-weight: 900; text-transform: uppercase; font-size: clamp(30px, 4vw, 46px);
-  line-height: 0.88; letter-spacing: -0.03em; margin: 6px 0 8px;
+  font-weight: 900; text-transform: uppercase; font-size: clamp(36px, 5.2vw, 64px);
+  line-height: 0.95; letter-spacing: -0.03em; margin: 14px 0 20px;
 }
-.lede { max-width: 760px; font-size: 15px; line-height: 1.45; color: #2b2a29; }
-.hero-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
-.hero-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 16px 0 0; }
-.hero-stats div { background: rgba(255, 255, 255, 0.72); border-radius: var(--r-card); padding: 8px 14px; }
-.hero-stats dt { font-size: 12px; color: var(--ash); }
-.hero-stats dd { margin: 0; font-size: 20px; letter-spacing: -0.03em; }
+.lede { max-width: 720px; font-size: 17px; line-height: 1.6; color: #2b2a29; }
+.hero-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px; }
+.hero-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin: 48px 0 0; }
+.hero-stats div { background: rgba(255, 255, 255, 0.72); border-radius: var(--r-card); padding: 16px 18px; }
+.hero-stats dt { font-size: 13px; line-height: 1.35; color: var(--ash); margin-bottom: 6px; }
+.hero-stats dd { margin: 0; font-size: 26px; letter-spacing: -0.03em; }
 
 /* Sections */
 .section { padding: 88px 0; }
@@ -256,8 +256,9 @@ b { font-weight: 600; }
 @media (max-width: 640px) {
   .wrap { padding: 0 16px; }
   .split, .steps, .metric-grid, .run-grid, .limits { grid-template-columns: 1fr; }
-  .hero { padding: 20px 0 18px; }
-  .hero-stats dd { font-size: 18px; }
+  .hero { padding: 48px 0 40px; }
+  .hero-stats { margin-top: 36px; }
+  .hero-stats dd { font-size: 21px; }
   .section { padding: 64px 0; }
   .map { height: 480px; min-height: 0; }
   .forecast { padding: 20px; }
@@ -269,7 +270,7 @@ b { font-weight: 600; }
 #replay .section-head h2 { font-size: clamp(26px, 3.4vw, 36px); margin: 6px 0 6px; }
 
 .heat { image-rendering: auto; }
-.hero .btn { padding: 8px 14px; font-size: 14px; }
+.hero .btn { padding: 12px 20px; font-size: 15px; }
 .legend .ramp-wrap { gap: 8px; }
 .legend .ramp {
   width: 140px; height: 10px; border-radius: 999px; border: 0;
