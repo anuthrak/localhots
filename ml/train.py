@@ -5,11 +5,17 @@ from the saved bundle and its protocol. With the pinned packages it reproduces t
 scores exactly on 2022-2024.
 
     python ml/train.py --data <wildfire-outlook dir> [--out model.joblib] [--select] [--compare]
+    python ml/train.py --region norcal --data <dir from build_dataset.py> --select --out model.joblib
 
 --select   re-run model selection (rolling folds x configs x blend weights). The original fold rules
            aren't recorded exactly; this version ranks history_shallow ~0.001 AP above the original
-           pick history_120 (within noise), so the final fit keeps history_120.
+           pick history_120 (within noise), so the datathon fit keeps history_120. Other regions fit
+           the winner.
 --compare  check the rebuilt model against <data>/model/model.joblib on the 2022-2024 test years
+
+Regions other than norcal24 have too many cells to use the cell as a category (the trees allow 255), so
+they drop cell_code and locate cells by latitude, longitude and their own fire history. Their crews
+check the riskiest 12.5% of cells each day, the same share as 3 of 24.
 """
 from __future__ import annotations
 
@@ -38,6 +44,8 @@ SMOOTHING = 60      # pseudo-days when shrinking fire rates: area-month -> month
 MIN_STD = 1.0       # floor for climate std so near-constant inputs (no rain) don't blow up anomalies
 ANOMALY_CLIP = 12
 REVIEW_K = 3        # areas a crew checks per day
+REVIEW_SHARE = REVIEW_K / 24
+MAX_CATEGORIES = 255
 
 # Selection protocol from the original run: validate on each 3-year window, train on the years before it.
 FOLDS = [(2015, 2016, 2017), (2017, 2018, 2019), (2019, 2020, 2021)]
@@ -57,7 +65,9 @@ def log(msg: str) -> None:
 
 
 def load(root: Path) -> pd.DataFrame:
-    data = pd.read_csv(root / "datasets/model_inputs.csv.gz", float_precision="round_trip", parse_dates=["target_date"])
+    path = root / "datasets/model_inputs.csv.gz"
+    data = pd.read_csv(path if path.exists() else root / "model_inputs.csv.gz", float_precision="round_trip",
+                       parse_dates=["target_date"])
     data["year"] = data.target_date.dt.year
     data["month"] = data.target_date.dt.month
     return data
@@ -78,8 +88,8 @@ def fit_history(rows: pd.DataFrame, cell_codes: dict[str, int]) -> dict:
             "cell_codes": cell_codes, "fitted_through": str(rows.target_date.max().date())}
 
 
-def features(rows: pd.DataFrame, history: dict) -> pd.DataFrame:
-    """The 27 model inputs; same assembly as predict.infer."""
+def features(rows: pd.DataFrame, history: dict, columns: list[str] = FEATURES) -> pd.DataFrame:
+    """The 27 model inputs (or the given subset); same assembly as predict.infer."""
     keys = [f"{c}:{m}" for c, m in zip(rows.cell_id, rows.month)]
     base = history["baseline"]
     x = rows[BASE_FEATURES].copy()
@@ -90,20 +100,21 @@ def features(rows: pd.DataFrame, history: dict) -> pd.DataFrame:
     for name in ANOMALIES:
         stats = np.array([history["climate"][k][name] for k in keys])
         x[name + "_anomaly"] = ((rows[name].to_numpy() - stats[:, 0]) / stats[:, 1]).clip(-ANOMALY_CLIP, ANOMALY_CLIP)
-    return x[FEATURES]
+    return x[columns]
 
 
-def expanding_features(data: pd.DataFrame, years, cell_codes: dict[str, int]) -> pd.DataFrame:
+def expanding_features(data: pd.DataFrame, years, cell_codes: dict[str, int], columns: list[str] = FEATURES) -> pd.DataFrame:
     """Inputs for each year built only from the years before it, so training rows never see their own year."""
     parts = []
     for year in years:
         past = data[(data.year >= HISTORY_START) & (data.year < year)]
-        parts.append(features(data[data.year == year], fit_history(past, cell_codes)))
+        parts.append(features(data[data.year == year], fit_history(past, cell_codes), columns))
     return pd.concat(parts).loc[data.index[data.year.isin(years)]]
 
 
-def make_model(config: dict) -> HistGradientBoostingClassifier:
-    return HistGradientBoostingClassifier(**config, categorical_features=CATEGORICAL, early_stopping=False, random_state=42)
+def make_model(config: dict, columns: list[str] = FEATURES) -> HistGradientBoostingClassifier:
+    return HistGradientBoostingClassifier(**config, categorical_features=[c for c in CATEGORICAL if c in columns],
+                                          early_stopping=False, random_state=42)
 
 
 def blend(model, X: pd.DataFrame, weather_weight: float) -> np.ndarray:
@@ -118,21 +129,21 @@ def top_k_recall(rows: pd.DataFrame, score: np.ndarray, k: int = REVIEW_K) -> fl
     return float((fires & (rank <= k)).sum() / fires.sum())
 
 
-def select(data: pd.DataFrame, cell_codes: dict[str, int]) -> pd.DataFrame:
-    """Mean validation AP and top-3 recall for every config x weather weight."""
+def select(data: pd.DataFrame, cell_codes: dict[str, int], columns: list[str] = FEATURES, k: int = REVIEW_K) -> pd.DataFrame:
+    """Mean validation AP and top-k recall for every config x weather weight."""
     results = []
     for fold in FOLDS:
         train_years = range(FIT_START, fold[0])
-        X = expanding_features(data, train_years, cell_codes)
+        X = expanding_features(data, train_years, cell_codes, columns)
         y = data.loc[X.index, "fire_next_day"]
         val = data[data.year.isin(fold)]
-        Xv = expanding_features(data, fold, cell_codes)
+        Xv = expanding_features(data, fold, cell_codes, columns)
         for name, config in CONFIGS.items():
-            model = make_model(config).fit(X, y)
+            model = make_model(config, columns).fit(X, y)
             for w in WEATHER_WEIGHTS:
                 s = blend(model, Xv, w)
                 results.append({"fold": fold[0], "config": name, "weather_weight": w,
-                                "ap": average_precision_score(val.fire_next_day, s), "top3": top_k_recall(val, s)})
+                                "ap": average_precision_score(val.fire_next_day, s), "top3": top_k_recall(val, s, k)})
         log(f"fold {fold}: trained on {train_years.start}-{train_years.stop - 1}")
     table = pd.DataFrame(results).groupby(["config", "weather_weight"])[["ap", "top3"]].mean().reset_index()
     # Rank: higher AP, then higher top-3 recall, then the simpler (lower) weather weight.
@@ -142,6 +153,7 @@ def select(data: pd.DataFrame, cell_codes: dict[str, int]) -> pd.DataFrame:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--data", type=Path, required=True, help="wildfire-outlook directory (datasets/ and model/)")
+    parser.add_argument("--region", default="norcal24", help="norcal24 (the datathon grid) or another region's table")
     parser.add_argument("--out", type=Path, help="where to save the rebuilt bundle (.joblib)")
     parser.add_argument("--select", action="store_true", help="re-run model selection first")
     parser.add_argument("--compare", action="store_true", help="compare with the original model on 2022-2024")
@@ -149,26 +161,35 @@ def main() -> None:
 
     data = load(args.data)
     cell_codes = {c: i for i, c in enumerate(sorted(data.cell_id.unique()))}
+    columns = FEATURES if len(cell_codes) <= MAX_CATEGORIES else [f for f in FEATURES if f != "cell_code"]
+    k = REVIEW_K if args.region == "norcal24" else max(1, round(REVIEW_SHARE * len(cell_codes)))
+    log(f"{args.region}: {len(cell_codes)} cells, {len(columns)} inputs, crews check the top {k} cells a day")
     config_name, weather_weight = FINAL
 
     if args.select:
         t0 = time.perf_counter()
-        table = select(data, cell_codes)
+        table = select(data, cell_codes, columns, k)
         log(f"selection took {time.perf_counter() - t0:.1f} s; top 8:\n{table.head(8).round(4).to_string()}")
         best = table.iloc[0]
         log(f"winner: {best.config} at weather weight {best.weather_weight} (original pick: {FINAL[0]} at {FINAL[1]})")
+        if args.region != "norcal24":
+            config_name, weather_weight = best.config, float(best.weather_weight)
 
     fit_years = range(FIT_START, FIT_END + 1)
-    X = expanding_features(data, fit_years, cell_codes)
+    X = expanding_features(data, fit_years, cell_codes, columns)
     t0 = time.perf_counter()
-    model = make_model(CONFIGS[config_name]).fit(X, data.loc[X.index, "fire_next_day"])
+    model = make_model(CONFIGS[config_name], columns).fit(X, data.loc[X.index, "fire_next_day"])
     log(f"fitted {config_name} on {len(X):,} rows ({FIT_START}-{FIT_END}) in {time.perf_counter() - t0:.1f} s")
 
     history = fit_history(data[(data.year >= HISTORY_START) & (data.year <= FIT_END)], cell_codes)
     test = data[data.year > FIT_END]
-    score = blend(model, features(test, history), weather_weight)
+    X_test = features(test, history, columns)
+    score = blend(model, X_test, weather_weight)
+    prior = X_test.historical_prior.to_numpy()
     metrics = {"ap": average_precision_score(test.fire_next_day, score), "roc_auc": roc_auc_score(test.fire_next_day, score),
-               "top3_recall": top_k_recall(test, score), "prevalence": float(test.fire_next_day.mean())}
+               "top3_recall": top_k_recall(test, score, k), "prevalence": float(test.fire_next_day.mean()),
+               "history_only_ap": average_precision_score(test.fire_next_day, prior),
+               "history_only_top3": top_k_recall(test, prior, k), "random_top3": k / len(cell_codes)}
     log("test 2022-2024: " + json.dumps({k: round(v, 4) for k, v in metrics.items()}))
 
     if args.compare:
@@ -181,7 +202,8 @@ def main() -> None:
     if args.out:
         bundle = {"version": 2, "selected_name": f"{config_name}__weather_{weather_weight}", "model": model,
                   "history": history, "weather_weight": weather_weight, "feature_set": "history_weather",
-                  "features": FEATURES, "sklearn": sklearn.__version__}
+                  "features": columns, "sklearn": sklearn.__version__, "region": args.region, "review_k": k,
+                  "metrics": metrics}
         joblib.dump(bundle, args.out)
         log(f"saved {args.out}")
 
