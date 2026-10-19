@@ -12,7 +12,7 @@ Built by a team of four at the **IBM Z Datathon 2026** (Oct 17–18, 2026), orig
 |---|---|
 | Model | Gradient-boosted trees (scikit-learn `HistGradientBoostingClassifier`), 27 weather and history features, trained on 2013–2021, tested on 2022–2024 |
 | Server | Python standard-library HTTP server with a small JSON API; scores each day live |
-| Website | HTML/CSS/JavaScript, Leaflet map with a canvas heat layer, Chart.js |
+| Website | React + Vite, Leaflet map with a canvas heat layer, Chart.js; hosted on Vercel as static files |
 | Original hosting | Docker on IBM LinuxONE (s390x) |
 
 Results on the 2022–2024 test years: average precision 0.438 (random: 0.119), ROC AUC 0.848, and checking just the top 3 of 24 areas catches 34% of fire days (random: 12.5%).
@@ -21,8 +21,10 @@ Results on the 2022–2024 test years: average precision 0.438 (random: 0.119), 
 
 | Path | What it is |
 |---|---|
-| `app/server.py` | API + static file server (`/api/overview`, `/api/day?date=YYYY-MM-DD`, `/api/health`) |
-| `app/static/` | The website |
+| `web/` | The website (React + Vite). `npm run dev` after exporting the data |
+| `app/server.py` | Python API that scores the model (`/api/overview.json`, `/api/day/YYYY-MM-DD.json`, `/api/health`); also serves the archived site |
+| `deploy/vercel/export.py` | Writes every API answer to `web/public/api/` as static JSON for the React site |
+| `archive/static-site/` | The original plain HTML/CSS/JS site from the datathon |
 | `ml/train.py` | Rebuilds the model from the dataset; reproduces the original scores exactly (`--compare`) |
 | `deploy/linuxone/run.sh` | How it ran on LinuxONE during the datathon |
 | `design.md` | Page plan, API and visual style |

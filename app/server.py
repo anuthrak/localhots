@@ -27,7 +27,7 @@ from sklearn.inspection import permutation_importance
 from sklearn.metrics import average_precision_score, precision_recall_curve, roc_auc_score
 
 PROJECT = Path(os.environ.get("WILDFIRE_DIR", "/work"))
-STATIC = Path(__file__).resolve().parent / "static"
+STATIC = Path(__file__).resolve().parents[1] / "archive/static-site"  # original plain-JS site; the React site is web/
 PORT = int(os.environ.get("PORT", "8080"))
 HOST = os.environ.get("HOST", "0.0.0.0")
 REVIEW_K = 3  # cells a crew checks per day
@@ -287,10 +287,11 @@ class Handler(SimpleHTTPRequestHandler):
         url = urlparse(self.path)
         if url.path == "/api/health":
             return self.send_json({"status": "ok", "machine": platform.machine()})
-        if url.path == "/api/overview":
+        if url.path in ("/api/overview", "/api/overview.json"):
             return self.send_json(OUTLOOK.overview)
-        if url.path == "/api/day":
-            day = (parse_qs(url.query).get("date") or [""])[0]
+        if url.path == "/api/day" or url.path.startswith("/api/day/"):
+            # /api/day/YYYY-MM-DD.json matches the static export (deploy/vercel); ?date= is the original form.
+            day = url.path[len("/api/day/"):].removesuffix(".json") if url.path.startswith("/api/day/") else (parse_qs(url.query).get("date") or [""])[0]
             try:
                 date.fromisoformat(day)
                 return self.send_json(OUTLOOK.day(day))

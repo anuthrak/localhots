@@ -237,7 +237,9 @@ function renderPanel(day) {
     <div><b>${s.fires}</b><span>fires discovered</span></div>
     <div><b>${s.fire_cells}</b><span>areas with fire</span></div>
     <div class="${cls}"><b>${s.caught}/${ov.metrics.review_k}</b><span>top picks with fire</span></div>`;
-  $("#live-note").textContent = `Scored live on IBM LinuxONE (${day.machine}) in ${day.live_ms.toFixed(1)} ms.`;
+  $("#live-note").textContent = ov.runtime.snapshot
+    ? `Scored by the model on IBM LinuxONE (${ov.runtime.machine}); this site shows the saved scores.`
+    : `Scored live on ${day.machine} in ${day.live_ms.toFixed(1)} ms.`;
 
   const top = day.cells.slice(0, ov.metrics.review_k);
   $("#watch").innerHTML = top.map((c) => `
@@ -322,7 +324,7 @@ async function loadDay(date) {
   moveCursor(date);
   let day = cache.get(date);
   if (!day) {
-    day = await getJSON(`/api/day?date=${date}`);
+    day = await getJSON(`/api/day/${date}.json`);
     cache.set(date, day);
     if (cache.size > 400) cache.delete(cache.keys().next().value);
   }
@@ -396,9 +398,12 @@ function fillNumbers() {
 
   const chip = $("#runtime-chip");
   chip.classList.add("ok");
-  chip.innerHTML = `<span class="dot"></span>Live on IBM LinuxONE · ${r.machine}`;
+  chip.innerHTML = r.snapshot
+    ? `<span class="dot"></span>Built on IBM LinuxONE · ${r.machine}`
+    : `<span class="dot"></span>Live server · ${r.machine}`;
+  if (!r.snapshot) $("#runtime-note").textContent = "The numbers below are reported live by the server you're running.";
 
-  $("#results-intro").textContent = `${nf.format(m.rows)} area-days (24 areas × 3 years), ${nf.format(m.positives)} of them with at least one fire. Recomputed live from the model each time the server starts.`;
+  $("#results-intro").textContent = `${nf.format(m.rows)} area-days (24 areas × 3 years), ${nf.format(m.positives)} of them with at least one fire. Recomputed from the model ${r.snapshot ? "when this site was built" : "each time the server starts"}.`;
 
   const tiles = [
     { tone: "tone-petal", label: "Average precision", value: m.average_precision.toFixed(3), vs: `Random guessing: ${m.prevalence.toFixed(3)} · past fire rate alone: ${m.baseline_average_precision.toFixed(3)}` },
@@ -417,7 +422,7 @@ function fillNumbers() {
   const mo = ov.model;
   const runs = [
     ["Architecture", r.machine, r.system],
-    ["CPUs", r.cpus, "LinuxONE Community Cloud"],
+    ["CPUs", r.cpus, r.snapshot ? "LinuxONE Community Cloud" : "this machine"],
     ["Python / scikit-learn", `${r.python} / ${r.sklearn}`, `numpy ${r.numpy} · pandas ${r.pandas}`],
     ["Model size", `${(mo.size_bytes / 1024).toFixed(0)} KB`, `${mo.trees} trees · ${mo.features} inputs`],
     ["Load model + data", `${nf.format(Math.round(r.load_ms))} ms`, "at server start"],
@@ -474,7 +479,7 @@ function drawCharts() {
 
 async function boot() {
   try {
-    ov = await getJSON("/api/overview");
+    ov = await getJSON("/api/overview.json");
   } catch (e) {
     $("#runtime-chip").textContent = "Server offline";
     $("#day-title").textContent = "Couldn't reach the model server.";

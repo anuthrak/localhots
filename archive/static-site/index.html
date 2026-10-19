@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>localhots</title>
-  <meta name="description" content="Replay three fire seasons in Northern California and see where a model running on IBM LinuxONE said to look first." />
+  <meta name="description" content="Replay three fire seasons in Northern California and see where a model built on IBM LinuxONE said to look first." />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><path fill='%23e8400d' d='M16 2c2 6 9 9 9 17a9 9 0 0 1-18 0c0-4 2-7 4-9 0 3 1 5 3 6 0-6 0-10 2-14z'/></svg>" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -144,7 +144,7 @@
           </div>
           <div class="card">
             <h3 class="h-sm">What the model leans on</h3>
-            <p class="muted small">How much the score quality drops when each input is scrambled (permutation importance, computed on LinuxONE when the server starts).</p>
+            <p class="muted small">How much the score quality drops when each input is scrambled (permutation importance on the 2022–2024 test years).</p>
             <div class="chart-box short"><canvas id="importance-chart"></canvas></div>
           </div>
         </div>
@@ -157,7 +157,7 @@
         <div class="section-head">
           <p class="eyebrow">Results · 2022–2024 test period</p>
           <h2>Ranking the right places first</h2>
-          <p class="muted" id="results-intro">Recomputed live from the model each time the server starts.</p>
+          <p class="muted" id="results-intro">Recomputed from the model on the test years.</p>
         </div>
 
         <div class="metric-grid" id="metric-grid"></div>
@@ -194,9 +194,9 @@
     <section id="linuxone" class="section dark">
       <div class="wrap">
         <div class="section-head">
-          <p class="eyebrow on-dark">Built and served on IBM LinuxONE</p>
-          <h2>The whole pipeline lives on one IBM Z machine</h2>
-          <p class="on-dark-muted">Data, training, model selection, inference and this website all run on a LinuxONE Community Cloud instance. The numbers below are reported live by the server you're talking to right now.</p>
+          <p class="eyebrow on-dark">Built on IBM LinuxONE</p>
+          <h2>The whole pipeline ran on one IBM Z machine</h2>
+          <p class="on-dark-muted">At the datathon, data, training, model selection, inference and this website all ran on a LinuxONE Community Cloud instance. <span id="runtime-note">The numbers below were measured there.</span></p>
         </div>
         <div class="run-grid" id="run-grid"></div>
         <div class="flow">
@@ -204,7 +204,7 @@
           <div><b>Feature builder</b><span>past-only, per area/day</span></div>
           <div><b>HistGradientBoosting</b><span>trained on s390x</span></div>
           <div><b>Docker container</b><span>read-only, 3 CPU / 2 GB</span></div>
-          <div><b>This website</b><span>live API on LinuxONE</span></div>
+          <div><b>This website</b><span>served from LinuxONE at the datathon</span></div>
         </div>
       </div>
     </section>
@@ -220,7 +220,7 @@
             <ol class="forecast-steps">
               <li>Fetch the daily forecast for all 24 areas (Open-Meteo)</li>
               <li>Build features exactly like training</li>
-              <li>Score on LinuxONE and publish tomorrow's top 3</li>
+              <li>Score every evening and publish tomorrow's top 3</li>
               <li>Track how it did the next day</li>
             </ol>
           </div>
