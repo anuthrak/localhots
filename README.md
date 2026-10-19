@@ -2,7 +2,7 @@
 
 Where will the next wildfire start? **localhots** ranks 24 areas of Northern California each day by how likely a new wildfire is *tomorrow*, and lets you replay the 2022–2024 fire seasons to see how often it pointed the right way.
 
-Built by a team of two at the **IBM Z Datathon 2026** (Oct 17–18, 2026), originally served from an IBM LinuxONE (s390x) mainframe. This repo is the continuation, being polished as a portfolio project.
+Built by a team of four at the **IBM Z Datathon 2026** (Oct 17–18, 2026), originally served from an IBM LinuxONE (s390x) mainframe. This repo is the continuation, being polished as a portfolio project.
 
 > The name: during the datathon we kept accidentally sending each other `localhost` links. It's also *local hots*: local hot spots.
 
@@ -31,7 +31,7 @@ The trained model and datasets are not in this repo yet.
 
 ## Credits
 
-- Team: Anuthrak (website, map and replay experience); teammate (model training, data pipeline, LinuxONE setup).
+- Team: Aleksandr Evtushenko, Bing He, Anuthrak Ratana, Kevin Ye.
 - Fire records: US Forest Service, Fire Program Analysis Fire-Occurrence Database (FPA FOD), 7th edition.
 - Weather: Open-Meteo historical API (Copernicus ERA5 reanalysis), CC BY 4.0.
 - Fuel moisture: gridMET. Elevation: USGS 3DEP.
