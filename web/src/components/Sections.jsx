@@ -4,7 +4,7 @@ import { nf, pct } from "../lib.js";
 
 const HOME_LINKS = [
   ["#replay", "Replay map"], ["#how", "How it works"], ["#results", "Results"], ["#linuxone", "LinuxONE"],
-  ["#forecast", "Live forecast"],
+  ["#forecast", "Live forecast"], [`${import.meta.env.BASE_URL}lightning/`, "Lightning"],
 ];
 const HOME_CTA = [`${import.meta.env.BASE_URL}norcal/`, "Detailed map"];
 

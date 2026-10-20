@@ -5,8 +5,11 @@ import { NorcalChanges, NorcalHero, NorcalLimits, NorcalResults } from "./compon
 import { expandDay, getJSON, setCellNames } from "./lib.js";
 
 const API = "api-norcal";
-const LINKS = [["#replay", "Replay map"], ["#how", "What changed"], ["#results", "Results"]];
+const LINKS = [
+  ["#replay", "Replay map"], ["#how", "What changed"], ["#results", "Results"], [`${import.meta.env.BASE_URL}lightning/`, "Lightning"],
+];
 const CTA = [import.meta.env.BASE_URL, "Original map"];
+export const NORCAL_SOURCES = "Fire data: US Forest Service, Fire Program Analysis Fire-Occurrence Database (FPA FOD), 7th edition. Weather: gridMET (University of California Merced / Climatology Lab). Place names: US Census Bureau Gazetteer. Map tiles © OpenStreetMap contributors. Research model, not an official warning service.";
 
 export default function Norcal() {
   const [ov, setOv] = useState(null);
@@ -31,7 +34,7 @@ export default function Norcal() {
           </>
         )}
       </main>
-      <Footer sources="Fire data: US Forest Service, Fire Program Analysis Fire-Occurrence Database (FPA FOD), 7th edition. Weather: gridMET (University of California Merced / Climatology Lab). Place names: US Census Bureau Gazetteer. Map tiles © OpenStreetMap contributors. Research model, not an official warning service." />
+      <Footer sources={NORCAL_SOURCES} />
     </>
   );
 }

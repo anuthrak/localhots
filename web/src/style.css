@@ -241,6 +241,18 @@ b { font-weight: 600; }
 
 .limits { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
 
+/* Experiment table (lightning page) */
+.table-card { padding: 8px 12px; overflow-x: auto; }
+.result-table { width: 100%; border-collapse: collapse; font-size: 15px; min-width: 560px; }
+.result-table th { text-align: left; font-size: 13px; font-weight: 500; color: var(--ash); padding: 10px 12px; }
+.result-table td { padding: 12px; border-top: 1px solid var(--hairline); }
+.result-table td:not(:first-child), .result-table th:not(:first-child) { text-align: right; }
+.result-table b { font-weight: 600; }
+.result-table .highlight td { background: var(--violet); }
+.result-table .up { color: #157a3f; }
+.result-table .down { color: #b3261e; }
+.table-note { padding: 8px 12px 6px; }
+
 .footer { background: var(--charcoal); color: rgba(255, 255, 255, 0.75); padding: 32px 0; }
 .footer p + p { margin-top: 6px; color: rgba(255, 255, 255, 0.5); }
 

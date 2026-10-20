@@ -4,7 +4,8 @@ before, and whether a fire was discovered that day.
     python ml/build_dataset.py --region norcal --data <dir from fetch_data.py>
     python ml/build_dataset.py --region norcal24 --data <wildfire-outlook>/datasets --check
 
-The first writes <data>/model_inputs.csv.gz and <data>/cells.json. --check rebuilds the datathon table
+The first writes <data>/model_inputs.csv.gz and <data>/cells.json; with --cause lightning (or human) the
+label counts only those fires and the files go to <data>/lightning/. --check rebuilds the datathon table
 from its original Open-Meteo downloads and compares it with the team's model_inputs.csv.gz.
 """
 from __future__ import annotations
@@ -26,6 +27,7 @@ MIN_LAND = 0.25     # gridMET cells need at least this share of land pixels (dro
 SPLITS = [(2018, "train"), (2021, "validation"), (2024, "test")]
 WEATHER = ["tmax", "rh", "wind", "rain"]
 GRIDMET = {"tmmx": "tmax", "rmin": "rh", "vs": "wind", "pr": "rain"}
+CAUSES = {"all": None, "human": "Human", "lightning": "Natural"}  # FPA FOD nwcg_cause_classification
 COLUMNS = ["target_date", "cell_id", "latitude", "longitude", "feature_window_end", "season_sin", "season_cos",
            "tmax_lag1", "tmax_mean7", "tmax_max7", "rhmin_lag1", "rhmin_mean7", "rhmin_min7", "windmax_lag1",
            "windmax_max3", "rain_lag1", "rain_sum7", "rain_sum14", "rain_sum30", "dry_days", "recorded_fires",
@@ -187,6 +189,8 @@ def main() -> None:
     parser.add_argument("--region", choices=REGIONS, required=True)
     parser.add_argument("--data", type=Path, required=True)
     parser.add_argument("--check", action="store_true", help="compare with the datathon table (norcal24 only)")
+    parser.add_argument("--cause", choices=CAUSES, default="all",
+                        help="label only fires of this NWCG cause class; writes to <data>/<cause>/")
     args = parser.parse_args()
     region = REGIONS[args.region]
     grid = make_grid(region)
@@ -200,6 +204,11 @@ def main() -> None:
         grid = grid[grid.land >= MIN_LAND].reset_index(drop=True)
         log(f"{len(grid)} cells with at least {MIN_LAND:.0%} land")
         fires = pd.read_csv(args.data / "fires.csv")
+    out = args.data
+    if args.cause != "all":
+        fires = fires[fires.nwcg_cause_classification == CAUSES[args.cause]]
+        out = args.data / args.cause
+        out.mkdir(exist_ok=True)
 
     table = build(grid, weather, fire_days(fires, region, grid))
     log(f"{len(table):,} rows, {table.fire_next_day.mean():.4f} with a fire")
@@ -208,13 +217,13 @@ def main() -> None:
         return
     if table.drop(columns="recorded_fires").isna().any().any():
         raise ValueError("missing weather in the table:\n" + table.isna().sum()[lambda s: s > 0].to_string())
-    table.to_csv(args.data / "model_inputs.csv.gz", index=False)
+    table.to_csv(out / "model_inputs.csv.gz", index=False)
     step = region["step"]
     cells = [{"id": c.cell_id, "row": int(c.row), "column": int(c.column), "land": float(c.land),
               "bounds": [[c.latitude - step / 2, c.longitude - step / 2], [c.latitude + step / 2, c.longitude + step / 2]]}
              for c in grid.itertuples()]
-    (args.data / "cells.json").write_text(json.dumps({"region": args.region, **region, "cells": cells}, indent=1))
-    log(f"wrote model_inputs.csv.gz and cells.json to {args.data}")
+    (out / "cells.json").write_text(json.dumps({"region": args.region, "cause": args.cause, **region, "cells": cells}, indent=1))
+    log(f"wrote model_inputs.csv.gz and cells.json to {out}")
 
 
 if __name__ == "__main__":

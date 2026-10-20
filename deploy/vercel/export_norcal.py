@@ -1,6 +1,10 @@
 """Export the Northern California 0.25-degree model as static JSON for the /norcal/ page.
 
     python deploy/vercel/export_norcal.py --data private/norcal
+    python deploy/vercel/export_norcal.py --data private/norcal --cause lightning --out api-lightning --heat-quantile 0.995
+
+With --cause, the model and table come from <data>/<cause>/ (ml/build_dataset.py --cause) and only fires
+of that cause are drawn; the results of ml/cause_experiment.py are included when present.
 
 Reads <data>/model.joblib (ml/train.py --region norcal), model_inputs.csv.gz and cells.json
 (ml/build_dataset.py) and places.tsv (ml/fetch_data.py), and writes web/public/api-norcal/:
@@ -26,8 +30,9 @@ from sklearn.inspection import permutation_importance
 from sklearn.metrics import average_precision_score, precision_recall_curve, roc_auc_score
 
 ROOT = Path(__file__).resolve().parents[2]
-OUT = ROOT / "web/public/api-norcal"
+PUBLIC = ROOT / "web/public"
 sys.path.insert(0, str(ROOT / "ml"))
+from build_dataset import CAUSES  # noqa: E402
 from train import HISTORY_START, blend, features, fit_history, load  # noqa: E402
 
 DATATHON_P95 = 0.4082         # 95th percentile of the 0.5-degree model's 2022-2024 scores
@@ -61,8 +66,9 @@ def r(v, d=4):
     return None if v is None or not np.isfinite(v) else round(float(v), d)
 
 
-def reasons(row, prior_high: float) -> list[str]:
-    """Same rules as app/server.py reasons_for, with the 'often has fires' bar scaled to the finer grid."""
+def reasons(row, prior_high: float, lightning: bool = False) -> list[str]:
+    """Same rules as app/server.py reasons_for, with the 'often has fires' bar scaled to the finer grid.
+    For lightning fires, recent rain usually means thunderstorms are about, so it's named as such."""
     out = []
     if row.tmax_lag1_anomaly >= 1 or row.tmax_mean7_anomaly >= 1:
         out.append("Hotter than normal for this time of year")
@@ -79,7 +85,7 @@ def reasons(row, prior_high: float) -> list[str]:
     if row.historical_prior >= prior_high:
         out.append("Area often has fires this month")
     if row.rain_sum7 >= 10:
-        out.append("Recent rain is lowering risk")
+        out.append("Showers or storms in the past week" if lightning else "Recent rain is lowering risk")
     return out[:3]
 
 
@@ -104,11 +110,17 @@ def place_names(cells: list[dict], places: pd.DataFrame) -> dict[str, str]:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--data", type=Path, required=True)
+    parser.add_argument("--cause", choices=list(CAUSES), default="all")
+    parser.add_argument("--out", default="api-norcal", help="folder under web/public/")
+    parser.add_argument("--heat-quantile", type=float, default=0.95,
+                        help="score percentile coloured like the original map's top 5%%; rarer fire types need a higher one (lightning: 0.995)")
     args = parser.parse_args()
+    OUT = PUBLIC / args.out
+    model_dir = args.data if args.cause == "all" else args.data / args.cause
 
-    bundle = joblib.load(args.data / "model.joblib")
-    meta = json.loads((args.data / "cells.json").read_text())
-    data = load(args.data)
+    bundle = joblib.load(model_dir / "model.joblib")
+    meta = json.loads((model_dir / "cells.json").read_text())
+    data = load(model_dir)
     cols, k = bundle["features"], bundle["review_k"]
     history = bundle["history"]
     cutoff = pd.Timestamp(history["fitted_through"])
@@ -125,8 +137,9 @@ def main() -> None:
     bench["top"] = bench["rank"] <= k
     y, s = bench.fire_next_day.to_numpy(), bench.score.to_numpy()
     prevalence = float(y.mean())
-    # Colour scale for the map: the top 5% of cells get the same colours as the top 5% of the original areas.
-    scale = DATATHON_P95 / float(np.quantile(s, 0.95))
+    # Colour scale for the map: by default the top 5% of cells get the same colours as the top 5% of the
+    # original areas. Bursty, rarer fire types match a smaller top share so storm days don't turn the map solid red.
+    scale = DATATHON_P95 / float(np.quantile(s, args.heat_quantile))
 
     order = [c["id"] for c in meta["cells"]]
     index = {cid: i for i, cid in enumerate(order)}
@@ -163,6 +176,8 @@ def main() -> None:
         fires=("recorded_fires", "sum"), fire_cells=("fire_next_day", "sum"), max_score=("score", "max"), caught=("hit", "sum"))
     totals = bench.groupby("cell_id").recorded_fires.sum()
     fires = pd.read_csv(args.data / "fires.csv")
+    if CAUSES[args.cause]:
+        fires = fires[fires.nwcg_cause_classification == CAUSES[args.cause]]
     fires["target_date"] = pd.to_datetime(fires.discovery_date, unit="ms").dt.normalize()
     (w, south, e, n), step = meta["bounds"], meta["step"]
     fires["cell_id"] = [f"r{int((la - south) // step)}c{int((lo - w) // step)}" for la, lo in zip(fires.latitude, fires.longitude)]
@@ -173,10 +188,11 @@ def main() -> None:
     model = bundle["model"]
     overview = {
         "region": {"name": meta["name"], "bounds": meta["bounds"], "step": step},
+        "cause": args.cause,
         "model": {"name": bundle["selected_name"], "version": bundle["version"], "learner": type(model).__name__,
                   "trees": int(model.n_iter_), "features": len(cols), "weather_weight": bundle["weather_weight"],
                   "trained_through": str(history["fitted_through"])[:10],
-                  "size_bytes": (args.data / "model.joblib").stat().st_size},
+                  "size_bytes": (model_dir / "model.joblib").stat().st_size},
         "dates": {"first": bench.target_date.min().strftime("%Y-%m-%d"), "last": bench.target_date.max().strftime("%Y-%m-%d")},
         "cells": [{"id": c["id"], "name": names[c["id"]], "bounds": c["bounds"], "land": c["land"],
                    "fires_total": int(totals.get(c["id"], 0))} for c in meta["cells"]],
@@ -204,6 +220,12 @@ def main() -> None:
                     "score_all_ms": round(score_ms, 1), "score_day_ms": round(float(np.median(reps)), 2)},
     }
 
+    experiment = args.data / "cause_experiment.json"
+    if args.cause != "all" and experiment.exists():
+        keep = ("type", "score", "fires", "prevalence", "ap", "ap_lift", "top_k_recall", "within_cell_auc")
+        overview["experiment"] = [{f: (r(v) if isinstance(v, float) else v) for f, v in row.items() if f in keep}
+                                  for row in json.loads(experiment.read_text())["rows"]]
+
     shutil.rmtree(OUT, ignore_errors=True)
     write(OUT / "overview.json", overview)
     prior_high = 0.3 / scale
@@ -219,7 +241,7 @@ def main() -> None:
                         "dry_days": [int(v) for v in g.dry_days], "past_rate": [r(v) for v in g.historical_prior]},
             "anomaly": {"heat": [r(v, 2) for v in g.tmax_lag1_anomaly], "humidity": [r(v, 2) for v in g.rhmin_lag1_anomaly],
                         "wind": [r(v, 2) for v in g.windmax_lag1_anomaly], "rain30": [r(v, 2) for v in g.rain_sum30_anomaly]},
-            "reasons": {index[c]: reasons(row, prior_high) for c, row in ranked.head(DETAILED).iterrows()},
+            "reasons": {index[c]: reasons(row, prior_high, args.cause == "lightning") for c, row in ranked.head(DETAILED).iterrows()},
             "fires": fire_points.get(date, []),
         })
     size = sum(f.stat().st_size for f in OUT.rglob("*.json"))
