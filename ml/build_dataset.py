@@ -97,29 +97,36 @@ def read_gridmet(path: Path) -> tuple[pd.DatetimeIndex, np.ndarray, np.ndarray, 
     return days, lat, lon, values
 
 
+def gridmet_cells(folder: Path, var: str, grid: pd.DataFrame, region: dict) -> tuple[pd.DataFrame, pd.Series]:
+    """One gridMET variable averaged over each cell's land pixels (days x cells), and each cell's land share.
+    grid needs row and column for every cell of the region's full grid."""
+    parts, land = [], None
+    rows, cols = round((region["bounds"][3] - region["bounds"][1]) / region["step"]), round((region["bounds"][2] - region["bounds"][0]) / region["step"])
+    for path in sorted(folder.glob(f"{var}_*.nc")):
+        days, lat, lon, values = read_gridmet(path)
+        r, c = cell_of(lat[:, None].repeat(len(lon), 1), lon[None, :].repeat(len(lat), 0), region)
+        inside = (r >= 0) & (r < rows) & (c >= 0) & (c < cols)
+        onehot = np.zeros((inside.sum(), rows * cols), dtype=np.float32)
+        onehot[np.arange(inside.sum()), (r * cols + c)[inside]] = 1
+        onehot = onehot[:, (grid.row * cols + grid.column).to_numpy()]
+        v = values[:, inside]
+        sums = np.nan_to_num(v) @ onehot
+        counts = (~np.isnan(v)).astype(np.float32) @ onehot
+        with np.errstate(invalid="ignore", divide="ignore"):
+            parts.append(pd.DataFrame(sums / counts, index=days, columns=grid.cell_id.to_numpy()))
+        if land is None:
+            land = pd.Series(counts[0] / onehot.sum(0), index=grid.cell_id.to_numpy())
+        log(f"read {path.name}")
+    frame = pd.concat(parts).sort_index()
+    return frame[~frame.index.duplicated()], land
+
+
 def gridmet_weather(data: Path, grid: pd.DataFrame, region: dict) -> tuple[dict[str, pd.DataFrame], pd.Series]:
     """Average gridMET pixels over each cell; returns per-cell daily weather and each cell's land share."""
     per_var, land = {}, None
     for var, name in GRIDMET.items():
-        parts = []
-        for path in sorted((data / "gridmet").glob(f"{var}_*.nc")):
-            days, lat, lon, values = read_gridmet(path)
-            r, c = cell_of(lat[:, None].repeat(len(lon), 1), lon[None, :].repeat(len(lat), 0), region)
-            rows, cols = grid.row.max() + 1, grid.column.max() + 1
-            inside = (r >= 0) & (r < rows) & (c >= 0) & (c < cols)
-            onehot = np.zeros((inside.sum(), rows * cols), dtype=np.float32)
-            onehot[np.arange(inside.sum()), (r * cols + c)[inside]] = 1
-            v = values[:, inside]
-            valid = ~np.isnan(v)
-            sums = np.nan_to_num(v) @ onehot
-            counts = valid.astype(np.float32) @ onehot
-            with np.errstate(invalid="ignore", divide="ignore"):
-                parts.append(pd.DataFrame(sums / counts, index=days, columns=grid.cell_id))
-            if land is None:
-                land = pd.Series(counts[0] / onehot.sum(0), index=grid.cell_id)
-            log(f"read {path.name}")
-        frame = pd.concat(parts).sort_index()
-        per_var[name] = frame[~frame.index.duplicated()]
+        per_var[name], share = gridmet_cells(data / "gridmet", var, grid, region)
+        land = share if land is None else land
     per_var["tmax"] = per_var["tmax"] - 273.15  # kelvin to Celsius
     weather = {cell: pd.DataFrame({n: per_var[n][cell] for n in WEATHER}) for cell in grid.cell_id}
     return weather, land
