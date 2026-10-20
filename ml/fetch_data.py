@@ -23,7 +23,8 @@ from pathlib import Path
 from regions import END, REGIONS, WEATHER_START
 
 FIRE_URL = "https://apps.fs.usda.gov/arcx/rest/services/EDW/EDW_FireOccurrenceCurrentEdition_01/MapServer/0/query"
-FIRE_FIELDS = ["objectid", "fod_id", "fire_year", "discovery_date", "latitude", "longitude", "state"]
+FIRE_FIELDS = ["objectid", "fod_id", "fire_year", "discovery_date", "latitude", "longitude", "state",
+               "nwcg_cause_classification", "nwcg_general_cause", "fire_size", "fire_size_class"]
 GRIDMET_URL = "https://www.reacchpna.org/thredds/ncss/grid/MET/{var}/{var}_{year}.nc"
 GRIDMET_VARS = {"tmmx": "air_temperature", "rmin": "relative_humidity", "vs": "wind_speed", "pr": "precipitation_amount",
                 # US fire danger indices (NFDRS fuel model G), used as baselines in ml/compare_indices.py
