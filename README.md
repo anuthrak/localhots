@@ -1,6 +1,8 @@
 # localhots
 
-Where will the next wildfire start? **localhots** ranks 24 areas of Northern California each day by how likely a new wildfire is *tomorrow*, and lets you replay the 2022–2024 fire seasons to see how often it pointed the right way.
+Where will the next wildfire start? **localhots** ranks 299 areas of Northern California each day by how likely a new wildfire is *tomorrow*, and lets you replay the 2022–2024 fire seasons to see how often it pointed the right way.
+
+The main finding: each area's fire history explains most fires, because people start them where people are, so weather adds little. Lightning fires are the exception. A lightning-only model catches 40% of lightning fire days by checking one area in eight, against 32% for fire history alone and 12% for random picks.
 
 Built by a team of four at the **IBM Z Datathon 2026** (Oct 17–18, 2026), originally served from an IBM LinuxONE (s390x) mainframe. This repo is the continuation, being polished as a portfolio project.
 
@@ -15,7 +17,7 @@ Built by a team of four at the **IBM Z Datathon 2026** (Oct 17–18, 2026), orig
 | Website | React + Vite, Leaflet map with a canvas heat layer, Chart.js; hosted on Vercel as static files |
 | Original hosting | Docker on IBM LinuxONE (s390x) |
 
-Results on the 2022–2024 test years: average precision 0.438 (random: 0.119), ROC AUC 0.848, and checking just the top 3 of 24 areas catches 34% of fire days (random: 12.5%).
+The original datathon model ranked 24 areas: on the 2022–2024 test years, checking its top 3 caught 34% of fire days (random: 12.5%). The site now shows the 299-area models, with the datathon numbers under its technical details.
 
 ## Layout
 
@@ -23,7 +25,8 @@ Results on the 2022–2024 test years: average precision 0.438 (random: 0.119), 
 |---|---|
 | `web/` | The website (React + Vite). `npm run dev` after exporting the data |
 | `app/server.py` | Python API that scores the model (`/api/overview.json`, `/api/day/YYYY-MM-DD.json`, `/api/health`); also serves the archived site |
-| `deploy/vercel/export.py` | Writes every API answer to `web/public/api/` as static JSON for the React site |
+| `deploy/vercel/export.py` | Writes every API answer to `web/public/api/` as static JSON for the React site (the datathon model) |
+| `deploy/vercel/export_norcal.py` | Writes the 299-area all-fire and lightning models' data to `web/public/api-norcal/` and `web/public/api-lightning/` |
 | `archive/static-site/` | The original plain HTML/CSS/JS site from the datathon |
 | `ml/train.py` | Rebuilds the model from the dataset; reproduces the original scores exactly (`--compare`) |
 | `deploy/linuxone/run.sh` | How it ran on LinuxONE during the datathon |

@@ -1,3 +1,6 @@
 {
+  "redirects": [
+    { "source": "/(norcal|lightning)/?", "destination": "/", "permanent": false }
+  ],
   "headers": [{ "source": "/(api|api-norcal|api-lightning)/(.*)", "headers": [{ "key": "Cache-Control", "value": "public, max-age=86400" }] }]
 }

@@ -5,7 +5,8 @@ import DayPanel from "./DayPanel.jsx";
 import { fmtDay, getJSON } from "../lib.js";
 
 // api: folder of day files; expand: turns a day file into per-cell objects (the main API already sends them).
-export default function Replay({ ov, api = "api", expand = (d) => d }) {
+// modes/mode/onMode: optional toggle between models shown above the controls, with a note on the current one.
+export default function Replay({ ov, api = "api", expand = (d) => d, modes, mode, onMode, note }) {
   const dates = ov.timeline.dates;
   // Busiest days (by fires discovered) as quick jumps.
   const busiest = useMemo(() => dates.map((d, i) => ({ d, f: ov.timeline.fires[i] }))
@@ -67,8 +68,17 @@ export default function Replay({ ov, api = "api", expand = (d) => d }) {
           <h2>Pick a day. See where it said to look.</h2>
           <p className="muted">The glow shows the model's risk, issued the evening before. {badges === k
             ? `Numbered badges are the top ${k} areas a crew would check.`
-            : `Numbered badges are the top ${badges} of the ${k} cells a crew would check.`} Dots are the fires actually discovered that day.</p>
+            : `Numbered badges are the top ${badges} of the ${k} areas a crew would check.`} Dots are the fires actually discovered that day.</p>
         </div>
+
+        {modes && (
+          <div className="mode-row">
+            <div className="segmented" role="group" aria-label="Which fires">
+              {modes.map((x) => <button key={x.key} aria-pressed={x.key === mode} onClick={() => onMode(x.key)}>{x.label}</button>)}
+            </div>
+            {note && <p className="small muted">{note}</p>}
+          </div>
+        )}
 
         <div className="controls card">
           <div className="control-row">

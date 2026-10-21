@@ -241,16 +241,31 @@ b { font-weight: 600; }
 
 .limits { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
 
-/* Experiment table (lightning page) */
-.table-card { padding: 8px 12px; overflow-x: auto; }
-.result-table { width: 100%; border-collapse: collapse; font-size: 15px; min-width: 560px; }
-.result-table th { text-align: left; font-size: 13px; font-weight: 500; color: var(--ash); padding: 10px 12px; }
-.result-table td { padding: 12px; border-top: 1px solid var(--hairline); }
-.result-table td:not(:first-child), .result-table th:not(:first-child) { text-align: right; }
-.result-table b { font-weight: 600; }
-.result-table .highlight td { background: var(--violet); }
-.result-table .up { color: #157a3f; }
-.result-table .down { color: #b3261e; }
+/* What we found */
+.limits.findings { grid-template-columns: repeat(3, 1fr); margin-top: 16px; }
+
+/* Replay: which model the map shows */
+.mode-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin-bottom: 16px; }
+.mode-row p { flex: 1 1 320px; margin: 0; }
+.segmented { display: inline-flex; padding: 4px; gap: 4px; background: var(--cream); border: 1px solid var(--hairline); border-radius: var(--r-btn); }
+.segmented button {
+  font: inherit; font-size: 15px; font-weight: 500; height: 36px; padding: 0 16px; border: 0; border-radius: 6px;
+  background: none; color: var(--ash); cursor: pointer;
+}
+.segmented button[aria-pressed="true"] { background: var(--ink); color: var(--canvas); }
+
+/* Technical details */
+.details { border: 1px solid var(--hairline); border-radius: var(--r-card); }
+.details summary { display: flex; flex-direction: column; gap: 6px; padding: 20px 24px; cursor: pointer; list-style: none; position: relative; }
+.details summary::-webkit-details-marker { display: none; }
+.details summary::after { content: "+"; position: absolute; right: 24px; top: 50%; transform: translateY(-50%); font-size: 28px; color: var(--ash); }
+.details[open] summary::after { content: "−"; }
+.details summary .h-sm { margin: 0; }
+.details-body { padding: 0 24px 24px; }
+.details-body > .h-sm { margin: 8px 0 16px; }
+.details-sub { margin-top: 40px !important; }
+.details-body .card p + p { margin-top: 10px; }
+.confusion.three { grid-template-columns: auto 1fr 1fr 1fr; }
 .table-note { padding: 8px 12px 6px; }
 
 .footer { background: var(--charcoal); color: rgba(255, 255, 255, 0.75); padding: 32px 0; }
@@ -273,6 +288,7 @@ b { font-weight: 600; }
   .nav nav::-webkit-scrollbar { display: none; }
   .nav nav a { white-space: nowrap; flex: none; }
   .chip-live { margin-left: auto; }
+  .limits.findings { grid-template-columns: 1fr; }
 }
 @media (max-width: 640px) {
   .wrap { padding: 0 16px; }
@@ -329,6 +345,14 @@ b { font-weight: 600; }
   .forecast { padding: 22px; gap: 0; }
   .forecast-preview { display: none; }
   .limits { gap: 10px; }
+  .segmented { width: 100%; }
+  .segmented button { flex: 1; padding: 0 8px; }
+  .details summary { padding: 18px 48px 18px 18px; }
+  .details summary::after { right: 18px; }
+  .details-body { padding: 0 14px 18px; }
+  .confusion.three { grid-template-columns: 1fr 1fr 1fr; }
+  .confusion.three .hd:empty { display: none; }
+  .confusion.three .hd:not(:empty):nth-child(n+5) { grid-column: 1 / -1; padding-top: 10px; }
   .footer { padding: 28px 0 36px; }
   .footer .tiny { line-height: 1.6; }
 }

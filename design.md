@@ -1,16 +1,19 @@
 # localhots — design
 
 ## Goal
-One page that shows judges (1) the replay map, (2) the results, (3) that everything runs on LinuxONE, and (4) the planned live forecast.
+One page (`web/`) with one story: fire history explains most fires; weather adds real value for lightning fires. It has to (1) show the ML project, (2) show useful data from the model and (3) stay simple to read. Anything that doesn't serve those goes in the collapsed technical details or the README.
 
-## Page sections (app/static/index.html)
-1. Hero: the question, two buttons, 4 headline numbers on a warm orange-to-violet wash.
-2. Replay map (`#replay`): date picker, prev/next, play season, busy-day jumps. A smooth heat glow blended from the 24 area scores, with a white wash over everything the model doesn't cover; numbered badges on the top 3 areas; actual fires as dots. Season strip below (fires per day, orange = top 3 caught one). Side panel: watch list with reasons and per-area weather.
-3. How it works (`#how`): collect → describe → learn → rank; permutation importance chart.
-4. Results (`#results`): AP, ROC AUC, top-3 recall, accuracy trap + confusion matrix, PR curve, per-year AP, top-3 vs random.
-5. LinuxONE (`#linuxone`, dark section): live runtime numbers from the server, pipeline diagram.
-6. Live forecast (`#forecast`): RESERVED ("coming soon"). Plan: nightly Open-Meteo forecast → same 27 features → score → publish tomorrow's map → score it next day. Needs a forecast-feature builder that matches training, plus `/api/forecast`.
-7. Honest limits, footer with data attribution.
+## Page sections (web/src/App.jsx)
+1. Hero: the question, the finding in two sentences, two buttons, 4 headline numbers (fires in the record, areas ranked, lightning fire days caught vs history alone and random).
+2. Replay map (`#replay`): toggle between the lightning model (default) and the all-fire model, both on the same 299-area grid; it keeps the date through the URL hash. Date picker, prev/next, play season, busy-day jumps, heat glow, numbered badges on the top picks, actual fires as dots, season strip, side panel with the watch list and per-area weather.
+3. What we found (`#findings`): one bar chart of fire days caught per fire type, fire history only vs the model, plus three takeaways (history wins for most fires, weather is the signal for lightning, ERC tells you when, not where).
+4. How it works (`#how`): collect → describe → learn → rank; no peeking; always checked against a simple guess.
+5. LinuxONE (`#linuxone`, dark section): the datathon's 24-area model and its runtime numbers on LinuxONE, pipeline diagram.
+6. Live forecast (`#forecast`): RESERVED ("coming soon"). Plan: nightly Open-Meteo forecast → same inputs plus thunderstorm signals → score → publish tomorrow's watch list → score it next day. Lightning first.
+7. Honest limits.
+8. Technical details (`#details`, collapsed): lightning model metrics, PR curve, accuracy trap, per-year, importance; the three models compared against random; what changed after the datathon.
+
+`/norcal/` and `/lightning/` were separate pages; they now redirect to `/` (`web/vercel.json`).
 
 ## API (app/server.py)
 - `GET /api/overview`: model info, cells, dates, metrics, PR curve, years, importance, timeline, runtime.
