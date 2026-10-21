@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import ChartBox, { grid } from "./ChartBox.jsx";
 import DayPanel from "./DayPanel.jsx";
 import ReplayMap from "./ReplayMap.jsx";
-import { FORECAST_URL, expandDay, fmtDay, nf, pct } from "../lib.js";
+import { FORECAST_URL, RISK, expandDay, fmtDay, nf, pct } from "../lib.js";
 
 const LINKS = [
   ["#replay", "Map"], ["#findings", "What we found"], ["#how", "How it works"], ["#linuxone", "LinuxONE"], ["#forecast", "Live forecast"],
@@ -224,6 +224,8 @@ export function Forecast({ all, lightning }) {
   const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" });
   const stale = day.date < today;
   const m = lightning.metrics;
+  // Below the map's first colour step everywhere: the badges still mark the top areas, but none really stands out.
+  const quiet = Math.max(...raw.score) * (m.heat_scale ?? 1) < RISK[0];
   return (
     <section id="forecast" className="section band">
       <div className="wrap">
@@ -231,6 +233,7 @@ export function Forecast({ all, lightning }) {
           <span className={`chip ${stale ? "chip-soon" : "chip-live ok"}`}><span className="dot"></span>{stale ? `Last forecast: ${fmtDay(day.date, { month: "short", day: "numeric" })}` : "Live · updated every evening"}</span>
           <h2>Tomorrow's lightning outlook</h2>
           <p className="muted">Every evening the lightning model scores all {lightning.cells.length} areas for the next day from the latest weather. Numbered badges are the top {m.badge_k} of the {m.review_k} areas a crew would check.{stale ? " Tonight's forecast hasn't been published yet." : ""}</p>
+          {quiet && <p className="quiet-note"><b>A quiet night.</b> Lightning risk is low everywhere, so the badges mark the least-unlikely areas rather than real hot spots.</p>}
         </div>
         <div className="replay-grid">
           <div className="map-col">

@@ -241,6 +241,10 @@ b { font-weight: 600; }
 
 .limits { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
 
+/* Live forecast */
+.quiet-note { margin-top: 14px; padding: 10px 14px; border-radius: var(--r-btn); background: var(--canary); font-size: 14px; }
+.quiet-note b { font-weight: 600; }
+
 /* What we found */
 .limits.findings { grid-template-columns: repeat(3, 1fr); margin-top: 16px; }
 
