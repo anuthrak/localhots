@@ -1,6 +1,7 @@
 import { RISK, fires, fmtDay, name, pct, riskColor } from "../lib.js";
 
-export default function DayPanel({ ov, day, selected, onSelect }) {
+// forecast: the live forecast's metadata; without it the panel describes a replay day and how it turned out.
+export default function DayPanel({ ov, day, selected, onSelect, forecast }) {
   if (!day) {
     return (
       <aside className="panel">
@@ -18,23 +19,29 @@ export default function DayPanel({ ov, day, selected, onSelect }) {
   return (
     <aside className="panel" aria-live="polite">
       <div className="card day-card">
-        <p className="eyebrow">Outlook issued evening of {fmtDay(day.issued, { weekday: "short", month: "short", day: "numeric" })}</p>
+        <p className="eyebrow">{forecast ? "Forecast" : "Outlook"} issued evening of {fmtDay(day.issued, { weekday: "short", month: "short", day: "numeric" })}</p>
         <h3>{fmtDay(day.date, { weekday: "long", month: "long", day: "numeric", year: "numeric" })}</h3>
-        <div className="verdict">
-          <div><b>{s.fires}</b><span>fires discovered</span></div>
-          <div><b>{s.fire_cells}</b><span>areas with fire</span></div>
-          <div className={verdict}><b>{s.caught}/{k}</b><span>top picks with fire</span></div>
-        </div>
-        <p className="tiny muted">
-          {ov.region
-            ? `Scored ahead of time by the ${ov.region.step}° model; this page shows the saved scores.`
-            : ov.runtime.snapshot
-              ? `Scored by the model on IBM LinuxONE (${ov.runtime.machine}); this site shows the saved scores.`
-              : `Scored live on ${day.machine} in ${day.live_ms.toFixed(1)} ms.`}
-        </p>
+        {forecast ? (
+          <p className="small muted">Weather: gridMET through {fmtDay(forecast.gridmet_through, { month: "short", day: "numeric" })}, then the Open-Meteo forecast. Scored by the lightning model each evening.</p>
+        ) : (
+          <>
+            <div className="verdict">
+              <div><b>{s.fires}</b><span>fires discovered</span></div>
+              <div><b>{s.fire_cells}</b><span>areas with fire</span></div>
+              <div className={verdict}><b>{s.caught}/{k}</b><span>top picks with fire</span></div>
+            </div>
+            <p className="tiny muted">
+              {ov.region
+                ? `Scored ahead of time by the ${ov.region.step}° model; this page shows the saved scores.`
+                : ov.runtime.snapshot
+                  ? `Scored by the model on IBM LinuxONE (${ov.runtime.machine}); this site shows the saved scores.`
+                  : `Scored live on ${day.machine} in ${day.live_ms.toFixed(1)} ms.`}
+            </p>
+          </>
+        )}
       </div>
 
-      {shown < k && <p className="small muted">Top {shown} of today's {k}-cell crew list:</p>}
+      {shown < k && <p className="small muted">Top {shown} of {forecast ? "tomorrow" : "today"}'s {k}-area crew list:</p>}
       <div className="watch">
         {day.cells.slice(0, shown).map((c) => (
           <button key={c.id} className={`watch-item${selected === c.id ? " active" : ""}`} onClick={() => onSelect(c.id)}>
@@ -42,12 +49,12 @@ export default function DayPanel({ ov, day, selected, onSelect }) {
             <span className="name">{name(c.id)}</span>
             <span className="score" style={{ background: riskColor(c.score * scale), color: c.score * scale >= RISK[2] ? "#fff" : "#111" }}>{c.score.toFixed(2)}</span>
             <ul>{(c.reasons.length ? c.reasons : ["Ranked high mostly on its fire history for this month"]).map((r) => <li key={r}>{r}</li>)}</ul>
-            <span className={`result ${c.fires ? "hit" : "miss"}`}>{c.fires ? `${fires(c.fires)} discovered here` : "No fire recorded here"}</span>
+            {!forecast && <span className={`result ${c.fires ? "hit" : "miss"}`}>{c.fires ? `${fires(c.fires)} discovered here` : "No fire recorded here"}</span>}
           </button>
         ))}
       </div>
 
-      {cell && <CellCard c={cell} ov={ov} />}
+      {cell && <CellCard c={cell} ov={ov} forecast={forecast} />}
     </aside>
   );
 }
@@ -59,7 +66,7 @@ function Anomaly({ z, invert = false }) {
   return <em className={bad ? "up" : "down"} style={{ display: "block", fontStyle: "normal", fontSize: 11 }}>{Math.abs(z).toFixed(1)}σ {up ? "above" : "below"} normal</em>;
 }
 
-function CellCard({ c, ov }) {
+function CellCard({ c, ov, forecast }) {
   const w = c.weather, a = c.anomaly;
   // The finer-grid page uses gridMET, whose wind is the day's average rather than its peak.
   const alert = ov.region ? " · on the crew list" : " · above alert line";
@@ -76,7 +83,7 @@ function CellCard({ c, ov }) {
         <div><span>Dry days in a row</span><b>{w.dry_days >= 30 ? "30+" : w.dry_days}</b></div>
         <div><span>Past fire rate (this month)</span><b>{pct(c.past_rate)}</b></div>
       </div>
-      <p className={`small ${c.fires ? "hit" : "miss"}`} style={{ marginTop: 12 }}>{c.fires ? `${fires(c.fires)} discovered here that day` : "No fire recorded here that day"}</p>
+      {!forecast && <p className={`small ${c.fires ? "hit" : "miss"}`} style={{ marginTop: 12 }}>{c.fires ? `${fires(c.fires)} discovered here that day` : "No fire recorded here that day"}</p>}
     </div>
   );
 }

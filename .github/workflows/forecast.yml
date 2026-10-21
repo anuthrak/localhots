@@ -1,0 +1,44 @@
+# Nightly lightning forecast: score tomorrow for every cell and publish it to Vercel Blob, where the site reads it.
+# Needs the forecast kit (python ml/forecast.py pack) as an asset on the "forecast-kit" release, and a
+# BLOB_READ_WRITE_TOKEN secret for the site's Blob store.
+name: Forecast
+
+on:
+  schedule:
+    - cron: "0 1 * * *"   # 6 pm in California in summer, 5 pm in winter
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency: forecast
+
+jobs:
+  forecast:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: ml/requirements-forecast.txt
+      - run: pip install -r ml/requirements-forecast.txt
+      - name: Download the forecast kit
+        run: gh release download forecast-kit --pattern forecast_kit.joblib --dir private
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - name: Score tomorrow
+        run: python ml/forecast.py run --kit private/forecast_kit.joblib --out out
+      - name: Publish to Vercel Blob
+        env:
+          BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
+        run: |
+          for f in out/*.json; do
+            name=$(basename "$f")
+            # latest.json changes every night, so it's cached briefly; dated files never change.
+            age=$([ "$name" = latest.json ] && echo 300 || echo 31536000)
+            npx --yes vercel@58 blob put "$f" --pathname "forecast/lightning/$name" --access public \
+              --allow-overwrite true --cache-control-max-age "$age" --non-interactive
+          done

@@ -1,6 +1,8 @@
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import ChartBox, { grid } from "./ChartBox.jsx";
-import { nf, pct } from "../lib.js";
+import DayPanel from "./DayPanel.jsx";
+import ReplayMap from "./ReplayMap.jsx";
+import { FORECAST_URL, expandDay, fmtDay, nf, pct } from "../lib.js";
 
 const LINKS = [
   ["#replay", "Map"], ["#findings", "What we found"], ["#how", "How it works"], ["#linuxone", "LinuxONE"], ["#forecast", "Live forecast"],
@@ -206,7 +208,57 @@ export function LinuxOne({ ov }) {
   );
 }
 
-export function Forecast({ all }) {
+// Tomorrow's lightning outlook from the nightly job; until one loads (or if none can), the plan for it.
+export function Forecast({ all, lightning }) {
+  const [raw, setRaw] = useState(null);
+  const [selected, setSelected] = useState(null);
+  useEffect(() => {
+    if (!lightning) return;
+    fetch(FORECAST_URL, { cache: "no-cache" }).then((r) => (r.ok ? r.json() : Promise.reject(r.status))).then(setRaw, () => {});
+  }, [lightning]);
+  const day = useMemo(() => raw && expandDay(lightning, raw), [raw, lightning]);
+  const select = useCallback((id) => setSelected((x) => (x === id ? null : id)), []);
+  if (!day) return <ForecastPlan all={all} />;
+
+  const f = raw.forecast;
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" });
+  const stale = day.date < today;
+  const m = lightning.metrics;
+  return (
+    <section id="forecast" className="section band">
+      <div className="wrap">
+        <div className="section-head">
+          <span className={`chip ${stale ? "chip-soon" : "chip-live ok"}`}><span className="dot"></span>{stale ? `Last forecast: ${fmtDay(day.date, { month: "short", day: "numeric" })}` : "Live · updated every evening"}</span>
+          <h2>Tomorrow's lightning outlook</h2>
+          <p className="muted">Every evening the lightning model scores all {lightning.cells.length} areas for the next day from the latest weather. Numbered badges are the top {m.badge_k} of the {m.review_k} areas a crew would check.{stale ? " Tonight's forecast hasn't been published yet." : ""}</p>
+        </div>
+        <div className="replay-grid">
+          <div className="map-col">
+            <ReplayMap ov={lightning} day={day} selected={selected} onSelect={select} duration={380} />
+            <div className="legend">
+              <span className="ramp-wrap">Lower risk <i className="ramp"></i> Higher risk</span>
+              <span><i className="rank-mini">1</i>Top {m.badge_k} picks</span>
+              <span><i className="fade-swatch"></i>Faded = outside model area</span>
+            </div>
+          </div>
+          <DayPanel ov={lightning} day={day} selected={selected} onSelect={select} forecast={f} />
+        </div>
+        <div className="split">
+          <div className="card">
+            <h3 className="h-sm">How it's made</h3>
+            <p className="muted">The model trained on gridMET weather, which runs about two days behind. So the last {f.open_meteo_days.length} day{f.open_meteo_days.length === 1 ? "" : "s"} before the forecast come from the Open-Meteo forecast instead. Issued {new Date(f.issued_at).toLocaleString("en-US", { timeZone: "America/Los_Angeles", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })} Pacific.</p>
+          </div>
+          <div className="card">
+            <h3 className="h-sm">How much to trust it</h3>
+            <p className="muted">We replayed summer 2024 with the forecasts Open-Meteo actually issued. The top-ranked areas got sharper (average precision 0.039, vs 0.028 with hindsight weather), but the full crew list caught 37% of lightning fire days, vs 44%: about as many as fire history alone. That's from only 116 fire days, so treat it as a first look. Outside summer, lightning fires are rare and the map stays quiet.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function ForecastPlan({ all }) {
   const n = all?.cells.length ?? 299;
   return (
     <section id="forecast" className="section">

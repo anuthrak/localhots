@@ -26,13 +26,20 @@ The original datathon model ranked 24 areas: on the 2022–2024 test years, chec
 | `web/` | The website (React + Vite). `npm run dev` after exporting the data |
 | `app/server.py` | Python API that scores the model (`/api/overview.json`, `/api/day/YYYY-MM-DD.json`, `/api/health`); also serves the archived site |
 | `deploy/vercel/export.py` | Writes every API answer to `web/public/api/` as static JSON for the React site (the datathon model) |
+| `ml/forecast.py` | The live lightning forecast: `pack` bundles the model for nightly runs, `run` scores tomorrow from gridMET plus the Open-Meteo forecast |
+| `.github/workflows/forecast.yml` | Runs the forecast every evening and publishes it to Vercel Blob, where the site reads it |
 | `deploy/vercel/export_norcal.py` | Writes the 299-area all-fire and lightning models' data to `web/public/api-norcal/` and `web/public/api-lightning/` |
 | `archive/static-site/` | The original plain HTML/CSS/JS site from the datathon |
 | `ml/train.py` | Rebuilds the model from the dataset; reproduces the original scores exactly (`--compare`) |
 | `deploy/linuxone/run.sh` | How it ran on LinuxONE during the datathon |
 | `design.md` | Page plan, API and visual style |
 
-The trained model and datasets are not in this repo yet.
+The trained model and datasets are not in this repo. The nightly forecast gets its model from the `forecast-kit` release asset; after retraining, re-pack and replace it:
+
+```
+python ml/forecast.py pack --data private/norcal --out private/forecast_kit.joblib
+gh release upload forecast-kit private/forecast_kit.joblib --clobber
+```
 
 ## Credits
 

@@ -40,7 +40,7 @@ export default function App() {
             <LinuxOne ov={data.base} />
           </>
         )}
-        <Forecast all={data?.all} />
+        <Forecast all={data?.all} lightning={data?.lightning} />
         {data && (
           <>
             <Limits lightning={data.lightning} />

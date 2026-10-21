@@ -46,6 +46,9 @@ export function expandDay(ov, d) {
   };
 }
 
+// The nightly forecast (.github/workflows/forecast.yml) publishes here, outside the site's own deploys.
+export const FORECAST_URL = "https://tglvkcgk3j17bof7.public.blob.vercel-storage.com/forecast/lightning/latest.json";
+
 export async function getJSON(path) {
   const res = await fetch(`${import.meta.env.BASE_URL}${path}`);
   if (!res.ok) throw new Error(res.statusText);

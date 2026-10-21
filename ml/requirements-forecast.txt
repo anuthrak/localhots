@@ -1,0 +1,6 @@
+# Pinned to the versions the models were trained with (a pickled scikit-learn model needs the same version).
+numpy==2.0.2
+pandas==3.0.6
+scipy==1.13.1
+scikit-learn==1.9.0
+joblib==1.6.0
