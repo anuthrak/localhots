@@ -244,6 +244,17 @@ b { font-weight: 600; }
 /* Live forecast */
 .quiet-note { margin-top: 14px; padding: 10px 14px; border-radius: var(--r-btn); background: var(--canary); font-size: 14px; }
 .quiet-note b { font-weight: 600; }
+.track { margin-top: 48px; }
+.track .section-head { margin-bottom: 16px; }
+.track .card + .card { margin-top: 12px; }
+.table-card { padding: 8px 12px; overflow-x: auto; }
+.track-table { width: 100%; border-collapse: collapse; font-size: 15px; min-width: 560px; }
+.track-table th { font-size: 13px; font-weight: 500; color: var(--ash); padding: 10px 12px; }
+.track-table td { padding: 12px; border-top: 1px solid var(--hairline); }
+.track-table th, .track-table td { text-align: right; }
+.track-table th:first-child, .track-table td:first-child, .track-table .l { text-align: left; }
+.track-table b { font-weight: 600; }
+.track-table .up { color: #157a3f; font-weight: 500; }
 
 /* What we found */
 .limits.findings { grid-template-columns: repeat(3, 1fr); margin-top: 16px; }

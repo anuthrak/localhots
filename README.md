@@ -27,7 +27,8 @@ The original datathon model ranked 24 areas: on the 2022–2024 test years, chec
 | `app/server.py` | Python API that scores the model (`/api/overview.json`, `/api/day/YYYY-MM-DD.json`, `/api/health`); also serves the archived site |
 | `deploy/vercel/export.py` | Writes every API answer to `web/public/api/` as static JSON for the React site (the datathon model) |
 | `ml/forecast.py` | The live lightning forecast: `pack` bundles the model for nightly runs, `run` scores tomorrow from gridMET plus the Open-Meteo forecast |
-| `.github/workflows/forecast.yml` | Runs the forecast every evening and publishes it to Vercel Blob, where the site reads it |
+| `ml/track.py` | The track record: scores each forecast's crew list against lightning fires reported to NIFC, against fire history alone and random picks; `backfill` reconstructs past days' forecasts |
+| `.github/workflows/forecast.yml` | Runs the forecast and the track record every evening and publishes them to Vercel Blob, where the site reads them |
 | `deploy/vercel/export_norcal.py` | Writes the 299-area all-fire and lightning models' data to `web/public/api-norcal/` and `web/public/api-lightning/` |
 | `archive/static-site/` | The original plain HTML/CSS/JS site from the datathon |
 | `ml/train.py` | Rebuilds the model from the dataset; reproduces the original scores exactly (`--compare`) |

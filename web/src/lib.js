@@ -47,7 +47,9 @@ export function expandDay(ov, d) {
 }
 
 // The nightly forecast (.github/workflows/forecast.yml) publishes here, outside the site's own deploys.
-export const FORECAST_URL = "https://tglvkcgk3j17bof7.public.blob.vercel-storage.com/forecast/lightning/latest.json";
+const FORECAST_BASE = "https://tglvkcgk3j17bof7.public.blob.vercel-storage.com/forecast/lightning";
+export const FORECAST_URL = `${FORECAST_BASE}/latest.json`;
+export const TRACK_URL = `${FORECAST_BASE}/track.json`; // ml/track.py: each forecast scored against reported fires
 
 export async function getJSON(path) {
   const res = await fetch(`${import.meta.env.BASE_URL}${path}`);

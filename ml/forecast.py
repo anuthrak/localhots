@@ -93,17 +93,18 @@ def gridmet_weather(region: dict, cells: list[dict], start: pd.Timestamp, end: p
     return out
 
 
-def open_meteo_weather(cells: list[dict]) -> dict[str, pd.DataFrame]:
-    """Days x cells from the Open-Meteo forecast at each cell's centre: the past week, today and tomorrow."""
+def open_meteo_weather(cells: list[dict], url: str = OPEN_METEO, **when) -> dict[str, pd.DataFrame]:
+    """Days x cells from the Open-Meteo forecast at each cell's centre: by default the past week, today and
+    tomorrow; when= takes other date parameters (start_date and end_date for archived forecasts)."""
     lat, lon = centres(cells)
     frames = {name: [] for name in OM_DAILY.values()}
     for i in range(0, len(cells), BATCH):
         params = {"latitude": ",".join(map(str, lat[i:i + BATCH])), "longitude": ",".join(map(str, lon[i:i + BATCH])),
                   "daily": ",".join(OM_DAILY), "wind_speed_unit": "ms", "timezone": "America/Los_Angeles",
-                  "past_days": 7, "forecast_days": 2}
+                  **(when or {"past_days": 7, "forecast_days": 2})}
         for attempt in range(6):
             try:
-                raw = json.loads(urllib.request.urlopen(f"{OPEN_METEO}?{urllib.parse.urlencode(params)}", timeout=120).read())
+                raw = json.loads(urllib.request.urlopen(f"{url}?{urllib.parse.urlencode(params)}", timeout=300).read())
                 break
             except OSError as e:
                 if attempt == 5:
@@ -130,6 +131,29 @@ def combine(gm: dict[str, pd.DataFrame], om: dict[str, pd.DataFrame], today: pd.
     return out, last
 
 
+def score_day(kit: dict, weather: dict[str, pd.DataFrame], target: pd.Timestamp) -> pd.DataFrame:
+    """One row per cell (in the kit's order) with the model inputs for target, its score and its rank, from
+    daily weather (days x cells) covering at least the 30 days before target."""
+    bundle, cells = kit["bundle"], kit["cells"]
+    lat, lon = centres(cells)
+    angle = 2 * np.pi * (target.dayofyear - 1) / 365.25
+    rows = []
+    for cell, la, lo in zip(cells, lat, lon):
+        w = pd.DataFrame({n: weather[n][cell["id"]] for n in WEATHER}).loc[:target - pd.Timedelta(days=1)]
+        w.loc[target] = np.nan  # the target day itself: weather_features reads only the days before it
+        x = weather_features(w).iloc[-1].to_dict()
+        rows.append({"target_date": target, "cell_id": cell["id"], "latitude": la, "longitude": lo,
+                     "season_sin": np.sin(angle), "season_cos": np.cos(angle), "month": target.month, **x})
+    rows = pd.DataFrame(rows)
+    X = features(rows, bundle["history"], bundle["features"])
+    rows["score"] = blend(bundle["model"], X, bundle["weather_weight"])
+    for c in X.columns:
+        if c not in rows:
+            rows[c] = X[c].to_numpy()
+    rows["rank"] = rows.score.rank(method="first", ascending=False).astype(int)
+    return rows
+
+
 def run(args) -> None:
     kit = joblib.load(args.kit)
     bundle, cells = kit["bundle"], kit["cells"]
@@ -143,23 +167,7 @@ def run(args) -> None:
     om = open_meteo_weather(cells)
     weather, gm_last = combine(gm, om, today)
     log(f"gridMET through {gm_last.date()}, Open-Meteo for {(today - gm_last).days} day(s) after that")
-
-    lat, lon = centres(cells)
-    angle = 2 * np.pi * (target.dayofyear - 1) / 365.25
-    rows = []
-    for cell, la, lo in zip(cells, lat, lon):
-        w = pd.DataFrame({n: weather[n][cell["id"]] for n in WEATHER})
-        w.loc[target] = np.nan  # the target day itself: weather_features reads only the days before it
-        x = weather_features(w).iloc[-1].to_dict()
-        rows.append({"target_date": target, "cell_id": cell["id"], "latitude": la, "longitude": lo,
-                     "season_sin": np.sin(angle), "season_cos": np.cos(angle), "month": target.month, **x})
-    rows = pd.DataFrame(rows)
-    X = features(rows, bundle["history"], bundle["features"])
-    rows["score"] = blend(bundle["model"], X, bundle["weather_weight"])
-    for c in X.columns:
-        if c not in rows:
-            rows[c] = X[c].to_numpy()
-    rows["rank"] = rows.score.rank(method="first", ascending=False).astype(int)
+    rows = score_day(kit, weather, target)
 
     prior_high = 0.3 / kit["heat_scale"]
     lightning = kit["cause"] == "lightning"

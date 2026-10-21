@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import ChartBox, { grid } from "./ChartBox.jsx";
 import DayPanel from "./DayPanel.jsx";
 import ReplayMap from "./ReplayMap.jsx";
-import { FORECAST_URL, RISK, expandDay, fmtDay, nf, pct } from "../lib.js";
+import { FORECAST_URL, RISK, TRACK_URL, expandDay, fmtDay, name, nf, pct } from "../lib.js";
 
 const LINKS = [
   ["#replay", "Map"], ["#findings", "What we found"], ["#how", "How it works"], ["#linuxone", "LinuxONE"], ["#forecast", "Live forecast"],
@@ -253,11 +253,77 @@ export function Forecast({ all, lightning }) {
           </div>
           <div className="card">
             <h3 className="h-sm">How much to trust it</h3>
-            <p className="muted">We replayed summer 2024 with the forecasts Open-Meteo actually issued. The top-ranked areas got sharper (average precision 0.039, vs 0.028 with hindsight weather), but the full crew list caught 37% of lightning fire days, vs 44%: about as many as fire history alone. That's from only 116 fire days, so treat it as a first look. Outside summer, lightning fires are rare and the map stays quiet.</p>
+            <p className="muted">We replayed summer 2024 with the forecasts Open-Meteo actually issued. The top-ranked areas got sharper (average precision 0.039, vs 0.028 with hindsight weather), but the full crew list caught 37% of lightning fire days, vs 44%: about as many as fire history alone. That's from only 116 fire days, so treat it as a first look. The 2026 season below points the same way: so far, forecast-fed scores don't beat fire history alone. Outside summer, lightning fires are rare and the map stays quiet.</p>
           </div>
         </div>
+        <TrackRecord cells={lightning.cells} />
       </div>
     </section>
+  );
+}
+
+// Each forecast's crew list scored against the lightning fires later reported (ml/track.py).
+// cells: the site's cell list, which the record's cell indexes refer to.
+function TrackRecord({ cells }) {
+  const [t, setT] = useState(null);
+  useEffect(() => {
+    fetch(TRACK_URL, { cache: "no-cache" }).then((r) => (r.ok ? r.json() : Promise.reject(r.status))).then(setT, () => {});
+  }, []);
+  if (!t) return null;
+  const { live, reconstructed } = t.summary;
+  const fireDays = t.days.filter((d) => d.over && d.fire_cells).reverse();
+  const firstLive = t.days.find((d) => !d.reconstructed)?.date;
+  const row = (label, s) => (
+    <tr>
+      <td>{label}</td>
+      <td>{s.days}</td>
+      <td>{s.fire_cells}</td>
+      <td><b>{s.recall == null ? "—" : `${pct(s.recall)} (${s.caught})`}</b></td>
+      <td>{s.recall_history == null ? "—" : `${pct(s.recall_history)} (${s.caught_history})`}</td>
+      <td>{pct(t.random)}</td>
+    </tr>
+  );
+  return (
+    <div className="track">
+      <div className="section-head">
+        <h3 className="h-sm">Track record</h3>
+        <p className="muted">Every night, each past forecast is checked against the lightning fires reported since. A fire counts as caught when it starts in one of that day's {t.review_k} crew-list areas.</p>
+      </div>
+      <div className="card table-card">
+        <table className="track-table">
+          <thead>
+            <tr><th></th><th>Days</th><th>Lightning fire area-days</th><th>Caught by the model</th><th>By fire history alone</th><th>Random</th></tr>
+          </thead>
+          <tbody>
+            {row(firstLive ? `Live, since ${fmtDay(firstLive, { month: "short", day: "numeric" })}` : "Live", live)}
+            {reconstructed.days > 0 && row("2026 season, reconstructed", reconstructed)}
+          </tbody>
+        </table>
+        <p className="tiny muted table-note">
+          {live.fire_cells === 0 && "No lightning fires have been reported in the forecast area since it went live; lightning season returns in summer. "}
+          Reconstructed days use the forecasts Open-Meteo issued at the time and gridMET with its usual two-day delay: what this pipeline would have published. Fires come from the national incident feed (NIFC WFIGS), which labels only about 1 in 4 lightning fires as lightning, so these counts are a sample.
+        </p>
+      </div>
+      {fireDays.length > 0 && (
+        <div className="card table-card">
+          <table className="track-table">
+            <thead><tr><th>Day</th><th>Lightning fires</th><th className="l">Where</th><th>Model's list</th><th>History's list</th></tr></thead>
+            <tbody>
+              {fireDays.slice(0, 12).map((d) => (
+                <tr key={d.date}>
+                  <td>{fmtDay(d.date, { month: "short", day: "numeric" })}{d.reconstructed ? "" : " · live"}</td>
+                  <td>{d.fires.length}</td>
+                  <td className="l">{[...new Set(d.fires.map((f) => name(cells[f[2]].id)))].slice(0, 3).join(", ")}</td>
+                  <td className={d.caught ? "up" : ""}>{d.caught} of {d.fire_cells}</td>
+                  <td className={d.caught_history ? "up" : ""}>{d.caught_history} of {d.fire_cells}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {fireDays.length > 12 && <p className="tiny muted table-note">Latest 12 of {fireDays.length} days with lightning fires.</p>}
+        </div>
+      )}
+    </div>
   );
 }
 

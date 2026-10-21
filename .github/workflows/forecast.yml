@@ -1,4 +1,5 @@
-# Nightly lightning forecast: score tomorrow for every cell and publish it to Vercel Blob, where the site reads it.
+# Nightly lightning forecast: score tomorrow for every cell, re-score the track record against reported
+# lightning fires, and publish both to Vercel Blob, where the site reads them.
 # Needs the forecast kit (python ml/forecast.py pack) as an asset on the "forecast-kit" release, and a
 # BLOB_READ_WRITE_TOKEN secret for the site's Blob store.
 name: Forecast
@@ -31,6 +32,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
       - name: Score tomorrow
         run: python ml/forecast.py run --kit private/forecast_kit.joblib --out out
+      - name: Update the track record
+        # If the fire feed is down, still publish tonight's forecast; the record catches up the next night.
+        continue-on-error: true
+        run: python ml/track.py update --kit private/forecast_kit.joblib --forecast out/latest.json --out out
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
