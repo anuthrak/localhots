@@ -31,14 +31,15 @@ jobs:
           GH_TOKEN: ${{ github.token }}
       - name: Score tomorrow
         run: python ml/forecast.py run --kit private/forecast_kit.joblib --out out
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: deploy/forecast/package-lock.json
       - name: Publish to Vercel Blob
+        working-directory: deploy/forecast
         env:
           BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
         run: |
-          for f in out/*.json; do
-            name=$(basename "$f")
-            # latest.json changes every night, so it's cached briefly; dated files never change.
-            age=$([ "$name" = latest.json ] && echo 300 || echo 31536000)
-            npx --yes vercel@58 blob put "$f" --pathname "forecast/lightning/$name" --access public \
-              --allow-overwrite true --cache-control-max-age "$age" --non-interactive
-          done
+          npm ci --no-audit --no-fund
+          node publish.mjs ../../out
