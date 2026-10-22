@@ -249,11 +249,11 @@ export function Forecast({ all, lightning }) {
         <div className="split">
           <div className="card">
             <h3 className="h-sm">How it's made</h3>
-            <p className="muted">The model trained on gridMET weather, which runs about two days behind. So the last {f.open_meteo_days.length} day{f.open_meteo_days.length === 1 ? "" : "s"} before the forecast come from the Open-Meteo forecast instead. Issued {new Date(f.issued_at).toLocaleString("en-US", { timeZone: "America/Los_Angeles", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })} Pacific.</p>
+            <p className="muted">The model trained on gridMET weather, which runs about two days behind. So the last {f.open_meteo_days.length} day{f.open_meteo_days.length === 1 ? "" : "s"} before the forecast come from the Open-Meteo forecast instead, with rain averaged over five points in each area: storm rain is patchy, and one point mostly misses it. Issued {new Date(f.issued_at).toLocaleString("en-US", { timeZone: "America/Los_Angeles", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })} Pacific.</p>
           </div>
           <div className="card">
             <h3 className="h-sm">How much to trust it</h3>
-            <p className="muted">We replayed summer 2024 with the forecasts Open-Meteo actually issued. The top-ranked areas got sharper (average precision 0.039, vs 0.028 with hindsight weather), but the full crew list caught 37% of lightning fire days, vs 44%: about as many as fire history alone. That's from only 116 fire days, so treat it as a first look. The 2026 season below points the same way: so far, forecast-fed scores don't beat fire history alone. Outside summer, lightning fires are rare and the map stays quiet.</p>
+            <p className="muted">We replayed summer 2024 with the forecasts Open-Meteo actually issued. Taking rain from each area's centre alone, the crew list caught 37% of lightning fire days, vs 44% with hindsight weather: no better than fire history alone (38%). Averaging rain over five points brought it back to 42%. That's from only 116 fire days, so treat it as a first look. The 2026 season below was reconstructed with centre-only rain, and so far it doesn't beat fire history alone. Outside summer, lightning fires are rare and the map stays quiet.</p>
           </div>
         </div>
         <TrackRecord cells={lightning.cells} />

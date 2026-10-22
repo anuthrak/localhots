@@ -24,13 +24,12 @@ import numpy as np
 import pandas as pd
 from sklearn.metrics import roc_auc_score
 
-from forecast import BATCH, open_meteo_weather
+from forecast import BATCH, OFFSETS, open_meteo_weather, points
 from forecast_experiment import SEASON, archived_forecasts, daily_gridmet, interval, swapped_rows, top_k
 from regions import REGIONS
 from track import ARCHIVE
 from train import blend, features, load
 
-OFFSETS = [(0, 0), (-0.25, -0.25), (-0.25, 0.25), (0.25, -0.25), (0.25, 0.25)]  # in cell widths from the centre
 DRAWS = 500
 WAIT, TRIES = 600, 24  # after a rate limit: wait 10 minutes, for up to 4 hours (the hourly limit is 5,000 calls)
 
@@ -48,17 +47,6 @@ def runs(days: list[pd.Timestamp]) -> list[tuple[pd.Timestamp, pd.Timestamp]]:
         else:
             out.append([d, d])
     return [tuple(r) for r in out]
-
-
-def points(cells: list[dict], step: float) -> list[dict]:
-    """Pseudo-cells whose centres are the sample points (id 'r3c4#2'), so open_meteo_weather can fetch them."""
-    out = []
-    for c in cells:
-        lat, lon = (c["bounds"][0][0] + c["bounds"][1][0]) / 2, (c["bounds"][0][1] + c["bounds"][1][1]) / 2
-        for j, (dy, dx) in enumerate(OFFSETS):
-            y, x = lat + dy * step, lon + dx * step
-            out.append({"id": f"{c['id']}#{j}", "bounds": [[y, x], [y, x]]})
-    return out
 
 
 def fetch_rain(cells: list[dict], step: float, days: list[pd.Timestamp], folder: Path) -> pd.DataFrame | None:

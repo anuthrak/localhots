@@ -8,7 +8,9 @@ order, the map colour scale) into one file, so the job never needs the training 
 <out>/latest.json and <out>/<target date>.json in the same compact shape as the replay's day files.
 
 Weather: gridMET, the data the model trained on, runs about two days behind. Those days, up to and including
-today, come from the Open-Meteo forecast at each cell's centre. A backtest on summer 2024 (Open-Meteo's archived
+today, come from the Open-Meteo forecast at each cell's centre, with rain averaged over the centre and the
+centres of the cell's four quarters: storm rain is patchy and gridMET averages it over the cell, so a single
+point mostly misses it (ml/rain_points.py: top-37 recall on summer 2024 37% -> 42%, gridMET 44%). A backtest on summer 2024 (Open-Meteo's archived
 forecasts) found shifting them by each cell's recent difference from gridMET made the rankings worse, so they're
 used as they are.
 """
@@ -45,6 +47,8 @@ GRIDMET = {"tmmx": "tmax", "rmin": "rh", "vs": "wind", "pr": "rain"}
 LOOKBACK = 45        # days of gridMET to fetch: the 30-day windows plus gridMET's delay and some slack
 WINDOW = 30          # the longest input window (30-day rain): every day in it must have weather
 BATCH = 50           # Open-Meteo locations per request
+PACE = 6             # seconds between requests: Open-Meteo allows 600 locations a minute
+OFFSETS = [(0, 0), (-0.25, -0.25), (-0.25, 0.25), (0.25, -0.25), (0.25, 0.25)]  # rain points, in cell widths from the centre
 
 
 def log(msg: str) -> None:
@@ -93,12 +97,32 @@ def gridmet_weather(region: dict, cells: list[dict], start: pd.Timestamp, end: p
     return out
 
 
-def open_meteo_weather(cells: list[dict], url: str = OPEN_METEO, **when) -> dict[str, pd.DataFrame]:
+def points(cells: list[dict], step: float) -> list[dict]:
+    """Pseudo-cells whose centres are each cell's rain points (id 'r3c4#2'; '#0' is the centre)."""
+    out = []
+    for c in cells:
+        lat, lon = (c["bounds"][0][0] + c["bounds"][1][0]) / 2, (c["bounds"][0][1] + c["bounds"][1][1]) / 2
+        for j, (dy, dx) in enumerate(OFFSETS):
+            y, x = lat + dy * step, lon + dx * step
+            out.append({"id": f"{c['id']}#{j}", "bounds": [[y, x], [y, x]]})
+    return out
+
+
+def open_meteo_weather(cells: list[dict], url: str = OPEN_METEO, step: float | None = None, **when) -> dict[str, pd.DataFrame]:
     """Days x cells from the Open-Meteo forecast at each cell's centre: by default the past week, today and
-    tomorrow; when= takes other date parameters (start_date and end_date for archived forecasts)."""
+    tomorrow; when= takes other date parameters (start_date and end_date for archived forecasts). With step
+    (the grid's cell width in degrees), rain is the mean over each cell's rain points (OFFSETS)."""
+    if step:
+        om = open_meteo_weather(points(cells, step), url, **when)
+        ids = [c["id"] for c in cells]
+        out = {name: f[[f"{i}#0" for i in ids]].set_axis(ids, axis=1) for name, f in om.items()}
+        out["rain"] = om["rain"].T.groupby(lambda pid: pid.split("#")[0]).mean().T[ids]
+        return out
     lat, lon = centres(cells)
     frames = {name: [] for name in OM_DAILY.values()}
     for i in range(0, len(cells), BATCH):
+        if i:
+            time.sleep(PACE)
         params = {"latitude": ",".join(map(str, lat[i:i + BATCH])), "longitude": ",".join(map(str, lon[i:i + BATCH])),
                   "daily": ",".join(OM_DAILY), "wind_speed_unit": "ms", "timezone": "America/Los_Angeles",
                   **(when or {"past_days": 7, "forecast_days": 2})}
@@ -164,7 +188,7 @@ def run(args) -> None:
     log(f"issuing {target.date()} on {today.date()} for {len(cells)} cells ({kit['cause']} fires)")
 
     gm = gridmet_weather(region, cells, today - pd.Timedelta(days=LOOKBACK), today)
-    om = open_meteo_weather(cells)
+    om = open_meteo_weather(cells, step=region["step"])
     weather, gm_last = combine(gm, om, today)
     log(f"gridMET through {gm_last.date()}, Open-Meteo for {(today - gm_last).days} day(s) after that")
     rows = score_day(kit, weather, target)

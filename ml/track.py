@@ -144,8 +144,9 @@ def backfill(args) -> None:
     kit = joblib.load(args.kit)
     cells, k = kit["cells"], kit["bundle"]["review_k"]
     start, end = pd.Timestamp(args.start), pd.Timestamp(args.end)
-    gm = gridmet_weather(REGIONS[kit["region"]], cells, start - pd.Timedelta(days=40), end)
-    om = open_meteo_weather(cells, ARCHIVE, start_date=str((start - pd.Timedelta(days=5)).date()), end_date=str(end.date()))
+    region = REGIONS[kit["region"]]
+    gm = gridmet_weather(region, cells, start - pd.Timedelta(days=40), end)
+    om = open_meteo_weather(cells, ARCHIVE, region["step"], start_date=str((start - pd.Timedelta(days=5)).date()), end_date=str(end.date()))
     log(f"weather: gridMET through {min(f.index.max() for f in gm.values()).date()}, archived forecasts {start.date()}-{end.date()}")
     by_date = {e["date"]: e for e in load_track(args.track)}
     for target in pd.date_range(start, end):
