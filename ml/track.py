@@ -33,6 +33,7 @@ import pandas as pd
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from build_dataset import WEATHER, cell_of  # noqa: E402
 from forecast import TZ, gridmet_weather, open_meteo_weather, score_day  # noqa: E402
+from hrrr import storms  # noqa: E402
 from regions import REGIONS  # noqa: E402
 
 WFIGS = "https://services3.arcgis.com/T4QMspbfLg3qTGWY/arcgis/rest/services/WFIGS_Incident_Locations/FeatureServer/0/query"
@@ -181,12 +182,14 @@ def backfill(args) -> None:
     if om is None:
         return
     log(f"weather: gridMET through {min(f.index.max() for f in gm.values()).date()}, archived forecasts {start.date()}-{end.date()}")
+    hr = storms(region, [c["id"] for c in cells], list(pd.date_range(start, end)), args.cache / "hrrr", log)         if kit.get("storm_weights") else None
     by_date = {e["date"]: e for e in load_track(args.track)}
     for target in pd.date_range(start, end):
         issued = target - pd.Timedelta(days=1)
         last = issued - pd.Timedelta(days=GRIDMET_DELAY)  # what gridMET would have reached on the issue day
         weather = {n: pd.concat([gm[n].loc[:last], om[n].loc[last + pd.Timedelta(days=1):issued, gm[n].columns]]) for n in WEATHER}
-        rows = score_day(kit, weather, target)
+        day = hr[hr.target_date == target] if hr is not None else None
+        rows = score_day(kit, weather, target, day.reset_index(drop=True) if day is not None and len(day) else None)
         date = target.strftime("%Y-%m-%d")
         if date in by_date and not by_date[date]["reconstructed"]:
             continue  # a live forecast for this day beats a reconstruction
@@ -210,7 +213,7 @@ def main() -> None:
     p.add_argument("--start", required=True)
     p.add_argument("--end", required=True)
     p.add_argument("--track", default=TRACK_URL, help="existing record to merge into (file or URL)")
-    p.add_argument("--cache", type=Path, default=Path("private/openmeteo_track"), help="where archived forecasts are kept between runs")
+    p.add_argument("--cache", type=Path, default=Path("private/openmeteo_track"), help="where archived forecasts (and HRRR, under hrrr/) are kept between runs")
     p.add_argument("--out", type=Path, required=True)
     p.set_defaults(func=backfill)
     args = parser.parse_args()

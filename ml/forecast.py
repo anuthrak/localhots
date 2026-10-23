@@ -13,6 +13,11 @@ centres of the cell's four quarters: storm rain is patchy and gridMET averages i
 point mostly misses it (ml/rain_points.py: top-37 recall on summer 2024 37% -> 42%, gridMET 44%). A backtest on summer 2024 (Open-Meteo's archived
 forecasts) found shifting them by each cell's recent difference from gridMET made the rankings worse, so they're
 used as they are.
+
+Storms: the model's inputs say how dry each cell is, not where storms will be, so each score is nudged by NOAA
+HRRR's storm forecast for the target day (ml/hrrr.py), with weights from ml/storm_experiment.py, which found it
+lifts summer 2024's top-37 recall on the nightly weather from 42% to 53%. If HRRR's run isn't on AWS, the
+forecast goes out without it.
 """
 from __future__ import annotations
 
@@ -37,6 +42,7 @@ sys.path.insert(0, str(ROOT / "deploy/vercel"))
 from build_dataset import WEATHER, gridmet_cells, weather_features  # noqa: E402
 from export_norcal import DETAILED, r, reasons  # noqa: E402
 from fetch_data import GRIDMET_URL, GRIDMET_VARS, request  # noqa: E402
+from hrrr import SIGNALS, standardise, storms  # noqa: E402
 from regions import REGIONS  # noqa: E402
 from train import features, blend  # noqa: E402
 
@@ -70,6 +76,12 @@ def pack(args) -> None:
     cells = [{**by_id[c["id"]], "name": c["name"]} for c in overview["cells"]]
     kit = {"bundle": bundle, "region": meta["region"], "cause": args.cause, "cells": cells,
            "heat_scale": overview["metrics"]["heat_scale"]}
+    storm_fit = model_dir / "storm_experiment.json"
+    if storm_fit.exists():
+        # The blend's weights relative to the model's, so the adjusted score keeps the model's scale.
+        c = json.loads(storm_fit.read_text())["coefficients"]["model+storms"]
+        kit["storm_weights"] = {s: c[s] / c["model"] for s in SIGNALS}
+        log(f"storm weights from {storm_fit}: {kit['storm_weights']}")
     joblib.dump(kit, args.out, compress=3)
     log(f"packed {len(cells)} cells, {bundle['selected_name']}, into {args.out} ({args.out.stat().st_size / 1e6:.1f} MB)")
 
@@ -155,9 +167,10 @@ def combine(gm: dict[str, pd.DataFrame], om: dict[str, pd.DataFrame], today: pd.
     return out, last
 
 
-def score_day(kit: dict, weather: dict[str, pd.DataFrame], target: pd.Timestamp) -> pd.DataFrame:
+def score_day(kit: dict, weather: dict[str, pd.DataFrame], target: pd.Timestamp, storm: pd.DataFrame | None = None) -> pd.DataFrame:
     """One row per cell (in the kit's order) with the model inputs for target, its score and its rank, from
-    daily weather (days x cells) covering at least the 30 days before target."""
+    daily weather (days x cells) covering at least the 30 days before target. With storm (HRRR's SIGNALS for
+    target, in the kit's order) and the kit's storm weights, the score is nudged by the storm forecast."""
     bundle, cells = kit["bundle"], kit["cells"]
     lat, lon = centres(cells)
     angle = 2 * np.pi * (target.dayofyear - 1) / 365.25
@@ -170,7 +183,12 @@ def score_day(kit: dict, weather: dict[str, pd.DataFrame], target: pd.Timestamp)
                      "season_sin": np.sin(angle), "season_cos": np.cos(angle), "month": target.month, **x})
     rows = pd.DataFrame(rows)
     X = features(rows, bundle["history"], bundle["features"])
-    rows["score"] = blend(bundle["model"], X, bundle["weather_weight"])
+    rows["score"] = rows["model_score"] = blend(bundle["model"], X, bundle["weather_weight"])
+    if storm is not None and kit.get("storm_weights"):
+        p = rows.score.clip(1e-6, 1 - 1e-6)
+        nudge = sum(w * standardise(storm[s]) for s, w in kit["storm_weights"].items())
+        rows["score"] = 1 / (1 + np.exp(-(np.log(p / (1 - p)) + nudge)))
+        rows["ltng"] = storm.ltng_max.to_numpy()
     for c in X.columns:
         if c not in rows:
             rows[c] = X[c].to_numpy()
@@ -191,7 +209,10 @@ def run(args) -> None:
     om = open_meteo_weather(cells, step=region["step"])
     weather, gm_last = combine(gm, om, today)
     log(f"gridMET through {gm_last.date()}, Open-Meteo for {(today - gm_last).days} day(s) after that")
-    rows = score_day(kit, weather, target)
+    storm = storms(region, [c["id"] for c in cells], [target], log=log) if kit.get("storm_weights") else None
+    storm = storm if storm is not None and len(storm) else None
+    log(f"HRRR storms: {'used' if storm is not None else 'not used'}")
+    rows = score_day(kit, weather, target, storm)
 
     prior_high = 0.3 / kit["heat_scale"]
     lightning = kit["cause"] == "lightning"
@@ -205,11 +226,13 @@ def run(args) -> None:
                     "dry_days": [int(v) for v in rows.dry_days], "past_rate": [r(v) for v in rows.historical_prior]},
         "anomaly": {"heat": [r(v, 2) for v in rows.tmax_lag1_anomaly], "humidity": [r(v, 2) for v in rows.rhmin_lag1_anomaly],
                     "wind": [r(v, 2) for v in rows.windmax_lag1_anomaly], "rain30": [r(v, 2) for v in rows.rain_sum30_anomaly]},
-        "reasons": {int(i): reasons(row, prior_high, lightning) for i, row in top.iterrows()},
+        "reasons": {int(i): (["Thunderstorms with lightning forecast here"] if row.get("ltng", 0) > 0 else [])
+                    + reasons(row, prior_high, lightning)[:2 if row.get("ltng", 0) > 0 else 3] for i, row in top.iterrows()},
         "fires": [],
         "forecast": {"issued_at": now.isoformat(timespec="seconds"), "cause": kit["cause"], "model": bundle["selected_name"],
                      "gridmet_through": gm_last.strftime("%Y-%m-%d"),
-                     "open_meteo_days": [d.strftime("%Y-%m-%d") for d in pd.date_range(gm_last + pd.Timedelta(days=1), today)]},
+                     "open_meteo_days": [d.strftime("%Y-%m-%d") for d in pd.date_range(gm_last + pd.Timedelta(days=1), today)],
+                     "storms": storm is not None},
     }
     args.out.mkdir(parents=True, exist_ok=True)
     for name in ("latest.json", f"{date}.json"):
