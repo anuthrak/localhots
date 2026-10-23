@@ -6,7 +6,8 @@
 update adds a forecast's crew list to the record (the published track.json, unless --track names another)
 and re-scores every day: fire causes are often filled in days or weeks late, so each night re-checks them all.
 backfill reconstructs what the nightly pipeline would have issued for past days, from Open-Meteo's archived
-forecasts and gridMET with its usual two-day delay, and marks those days as reconstructed.
+forecasts and gridMET with its usual two-day delay, and marks those days as reconstructed. A season of archived
+forecasts is more than Open-Meteo's daily limit, so they're cached (--cache) and a re-run resumes.
 
 Fires: wildfires with cause "Natural" from NIFC's WFIGS incident feed, by discovery date in California time.
 The feed leaves most causes "Undetermined" (in 2024 it labelled about 1 in 4 of FPA FOD's lightning fires as
@@ -18,6 +19,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -38,6 +40,8 @@ TRACK_URL = "https://tglvkcgk3j17bof7.public.blob.vercel-storage.com/forecast/li
 ARCHIVE = "https://historical-forecast-api.open-meteo.com/v1/forecast"
 GRIDMET_DELAY = 2   # days between gridMET's last day and the issue day, as in the nightly runs
 PAGE = 2000
+SPAN = 14           # days of archived forecasts per download: Open-Meteo counts each two weeks per location as a call
+WAIT, TRIES = 600, 24  # after a rate limit: wait 10 minutes, for up to 4 hours (the hourly limit is 5,000 calls)
 
 
 def log(msg: str) -> None:
@@ -65,6 +69,33 @@ def lightning_fires(region: dict, start: pd.Timestamp, end: pd.Timestamp) -> pd.
     day = pd.to_datetime(f.FireDiscoveryDateTime, unit="ms", utc=True).dt.tz_convert(TZ).dt.tz_localize(None).dt.normalize()
     f = pd.DataFrame({"day": day, "latitude": f.InitialLatitude, "longitude": f.InitialLongitude})
     return f[f.day.between(start, end)].reset_index(drop=True)
+
+
+def archived_weather(cells: list[dict], step: float, start: pd.Timestamp, end: pd.Timestamp, folder: Path) -> dict[str, pd.DataFrame] | None:
+    """Open-Meteo's archived forecasts (rain over five points per cell), two weeks at a time, cached under folder:
+    a season is more than Open-Meteo's daily limit, so a stopped run resumes where it left off. None if it stopped."""
+    folder.mkdir(parents=True, exist_ok=True)
+    parts = []
+    for lo in pd.date_range(start, end, freq=f"{SPAN}D"):
+        hi = min(lo + pd.Timedelta(days=SPAN - 1), end)
+        path = folder / f"{lo.date()}_{hi.date()}.csv"
+        for attempt in range(TRIES):
+            if path.exists():
+                break
+            try:
+                om = open_meteo_weather(cells, ARCHIVE, step, start_date=str(lo.date()), end_date=str(hi.date()))
+                pd.concat({v: f.stack() for v, f in om.items()}, axis=1).rename_axis(["day", "cell_id"]).to_csv(path)
+                log(f"fetched archived forecasts {lo.date()} to {hi.date()}")
+            except (urllib.error.HTTPError, OSError) as e:
+                if attempt == TRIES - 1:
+                    log(f"stopped at {lo.date()}: {e}. Re-run later to resume (Open-Meteo's daily limit resets at midnight UTC).")
+                    return None
+                log(f"{e}; waiting {WAIT // 60} minutes")
+                time.sleep(WAIT)
+        parts.append(pd.read_csv(path, parse_dates=["day"]))
+    flat = pd.concat(parts)
+    ids = [c["id"] for c in cells]
+    return {v: flat.pivot(index="day", columns="cell_id", values=v)[ids] for v in WEATHER}
 
 
 def entry(date: str, issued: str, score, past_rate, k: int, reconstructed: bool) -> dict:
@@ -146,7 +177,9 @@ def backfill(args) -> None:
     start, end = pd.Timestamp(args.start), pd.Timestamp(args.end)
     region = REGIONS[kit["region"]]
     gm = gridmet_weather(region, cells, start - pd.Timedelta(days=40), end)
-    om = open_meteo_weather(cells, ARCHIVE, region["step"], start_date=str((start - pd.Timedelta(days=5)).date()), end_date=str(end.date()))
+    om = archived_weather(cells, region["step"], start - pd.Timedelta(days=5), end, args.cache)
+    if om is None:
+        return
     log(f"weather: gridMET through {min(f.index.max() for f in gm.values()).date()}, archived forecasts {start.date()}-{end.date()}")
     by_date = {e["date"]: e for e in load_track(args.track)}
     for target in pd.date_range(start, end):
@@ -177,6 +210,7 @@ def main() -> None:
     p.add_argument("--start", required=True)
     p.add_argument("--end", required=True)
     p.add_argument("--track", default=TRACK_URL, help="existing record to merge into (file or URL)")
+    p.add_argument("--cache", type=Path, default=Path("private/openmeteo_track"), help="where archived forecasts are kept between runs")
     p.add_argument("--out", type=Path, required=True)
     p.set_defaults(func=backfill)
     args = parser.parse_args()

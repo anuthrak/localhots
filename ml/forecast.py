@@ -130,7 +130,7 @@ def open_meteo_weather(cells: list[dict], url: str = OPEN_METEO, step: float | N
             try:
                 raw = json.loads(urllib.request.urlopen(f"{url}?{urllib.parse.urlencode(params)}", timeout=300).read())
                 break
-            except OSError as e:
+            except (OSError, ValueError) as e:  # ValueError: a response cut off mid-way
                 if attempt == 5:
                     raise
                 log(f"Open-Meteo retry after {e}")
