@@ -7,6 +7,9 @@ name: Forecast
 on:
   schedule:
     - cron: "0 1 * * *"   # 6 pm in California in summer, 5 pm in winter
+    # Backups in case a weather source was down; they stop early if tonight's forecast is already out.
+    - cron: "0 3 * * *"
+    - cron: "0 5 * * *"
   workflow_dispatch:
 
 permissions:
@@ -15,7 +18,24 @@ permissions:
 concurrency: forecast
 
 jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      done: ${{ steps.check.outputs.done }}
+    steps:
+      - name: Is tonight's forecast already out?
+        id: check
+        if: github.event_name == 'schedule'
+        run: |
+          url=https://tglvkcgk3j17bof7.public.blob.vercel-storage.com/forecast/lightning/latest.json  # FORECAST_URL in web/src/lib.js
+          issued=$(curl -fsS "$url" | python3 -c "import json, sys; print(json.load(sys.stdin)['issued'])" || true)
+          today=$(TZ=America/Los_Angeles date +%F)
+          echo "latest.json issued ${issued:-?}, today is $today"
+          echo "done=$([ "$issued" = "$today" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
   forecast:
+    needs: check
+    if: needs.check.outputs.done != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:

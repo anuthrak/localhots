@@ -54,6 +54,7 @@ LOOKBACK = 45        # days of gridMET to fetch: the 30-day windows plus gridMET
 WINDOW = 30          # the longest input window (30-day rain): every day in it must have weather
 BATCH = 50           # Open-Meteo locations per request
 PACE = 6             # seconds between requests: Open-Meteo allows 600 locations a minute
+OM_TIMEOUT = 90      # seconds per Open-Meteo request: a hung handshake should retry, not use up the night's job
 OFFSETS = [(0, 0), (-0.25, -0.25), (-0.25, 0.25), (0.25, -0.25), (0.25, 0.25)]  # rain points, in cell widths from the centre
 
 
@@ -140,7 +141,7 @@ def open_meteo_weather(cells: list[dict], url: str = OPEN_METEO, step: float | N
                   **(when or {"past_days": 7, "forecast_days": 2})}
         for attempt in range(6):
             try:
-                raw = json.loads(urllib.request.urlopen(f"{url}?{urllib.parse.urlencode(params)}", timeout=300).read())
+                raw = json.loads(urllib.request.urlopen(f"{url}?{urllib.parse.urlencode(params)}", timeout=OM_TIMEOUT).read())
                 break
             except (OSError, ValueError) as e:  # ValueError: a response cut off mid-way
                 if attempt == 5:
