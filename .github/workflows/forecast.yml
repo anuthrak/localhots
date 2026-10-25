@@ -25,13 +25,16 @@ jobs:
     steps:
       - name: Is tonight's forecast already out?
         id: check
-        if: github.event_name == 'schedule'
+        # Only the backups check: the main run always issues, even over a forecast a late backup put out.
+        if: github.event_name == 'schedule' && github.event.schedule != '0 1 * * *'
         run: |
           url=https://tglvkcgk3j17bof7.public.blob.vercel-storage.com/forecast/lightning/latest.json  # FORECAST_URL in web/src/lib.js
           issued=$(curl -fsS "$url" | python3 -c "import json, sys; print(json.load(sys.stdin)['issued'])" || true)
-          today=$(TZ=America/Los_Angeles date +%F)
-          echo "latest.json issued ${issued:-?}, today is $today"
-          echo "done=$([ "$issued" = "$today" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          # GitHub can start a backup hours late; before noon Pacific it still belongs to the evening before
+          # (EVENING in ml/forecast.py).
+          evening=$(TZ=America/Los_Angeles date -d '12 hours ago' +%F)
+          echo "latest.json issued ${issued:-?}, tonight is $evening"
+          echo "done=$([[ "$issued" > "$evening" || "$issued" = "$evening" ]] && echo true || echo false)" >> "$GITHUB_OUTPUT"
 
   forecast:
     needs: check

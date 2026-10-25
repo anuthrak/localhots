@@ -28,7 +28,7 @@ import tempfile
 import time
 import urllib.parse
 import urllib.request
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -47,6 +47,7 @@ from regions import REGIONS  # noqa: E402
 from train import features, blend  # noqa: E402
 
 TZ = ZoneInfo("America/Los_Angeles")
+EVENING = 12         # hours: a run before noon Pacific (a backup delayed past midnight) still issues the evening before
 OPEN_METEO = "https://api.open-meteo.com/v1/forecast"
 OM_DAILY = {"temperature_2m_max": "tmax", "relative_humidity_2m_min": "rh", "wind_speed_10m_mean": "wind", "precipitation_sum": "rain"}
 GRIDMET = {"tmmx": "tmax", "rmin": "rh", "vs": "wind", "pr": "rain"}
@@ -54,7 +55,7 @@ LOOKBACK = 45        # days of gridMET to fetch: the 30-day windows plus gridMET
 WINDOW = 30          # the longest input window (30-day rain): every day in it must have weather
 BATCH = 50           # Open-Meteo locations per request
 PACE = 6             # seconds between requests: Open-Meteo allows 600 locations a minute
-OM_TIMEOUT = 90      # seconds per Open-Meteo request: a hung handshake should retry, not use up the night's job
+OM_TIMEOUT = 30      # seconds per Open-Meteo request (answers take 1-5 s): a hung handshake should retry, not use up the night's job
 OFFSETS = [(0, 0), (-0.25, -0.25), (-0.25, 0.25), (0.25, -0.25), (0.25, 0.25)]  # rain points, in cell widths from the centre
 
 
@@ -202,7 +203,7 @@ def run(args) -> None:
     bundle, cells = kit["bundle"], kit["cells"]
     region = REGIONS[kit["region"]]
     now = datetime.now(timezone.utc)
-    today = pd.Timestamp(args.today) if args.today else pd.Timestamp(now.astimezone(TZ).date())
+    today = pd.Timestamp(args.today) if args.today else pd.Timestamp((now.astimezone(TZ) - timedelta(hours=EVENING)).date())
     target = today + pd.Timedelta(days=1)
     log(f"issuing {target.date()} on {today.date()} for {len(cells)} cells ({kit['cause']} fires)")
 
