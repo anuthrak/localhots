@@ -8,6 +8,8 @@ const LINKS = [
   ["#replay", "Map"], ["#findings", "What we found"], ["#how", "How it works"], ["#linuxone", "LinuxONE"], ["#forecast", "Live forecast"],
 ];
 const CTA = ["https://github.com/anuthrak/localhots", "Code on GitHub"];
+const TEAM = ["Aleksandr Evtushenko", "Bing He", "Anuthrak Ratana", "Kevin Ye"];
+const AUTHOR_URL = "https://github.com/anuthrak";
 
 const km = (deg, lat) => Math.round(deg * 111.3 * (lat === undefined ? 1 : Math.cos((lat * Math.PI) / 180)));
 
@@ -43,6 +45,7 @@ export function Hero({ all, lightning }) {
           <a href="#replay" className="btn btn-primary">Replay a fire season</a>
           <a href="#findings" className="btn btn-light">What we found</a>
         </div>
+        <p className="byline">A team project from IBM Z Datathon 2026, developed since by <a href={AUTHOR_URL}>Anuthrak Ratana</a>.</p>
         <dl className="hero-stats">
           <div><dt>Fires in the record, 2012–2024</dt><dd>{all ? nf.format(all.data.fire_records_total) : "—"}</dd></div>
           <div><dt>Areas ranked each day</dt><dd>{all?.cells.length ?? "—"}</dd></div>
@@ -115,7 +118,7 @@ export function Findings({ lightning }) {
         </div>
         <div className="card">
           <ChartBox config={chart} />
-          <p className="tiny muted table-note">Tested on 2022–2024, years no model saw in training. Random picks catch {pct(m.review_random)}. Every fire type uses the same model settings so they compare fairly; the lightning model on the map was tuned on its own and catches {pct(m.review_recall)}.</p>
+          <p className="tiny muted table-note">Tested on 2022–2024, years no model saw in training. Random picks catch {pct(m.review_random)}. Every fire type uses the same model settings so they compare fairly. The lightning model on the map was tuned on its own and catches {pct(m.review_recall)}, the figure at the top of the page.</p>
         </div>
         <div className="limits findings">
           <div className="card"><h3 className="h-sm">Most fires: history wins</h3><p className="muted">People start fires where people are: roads, towns, power lines. Fire history already knows those places, so for human-caused and unknown-cause fires, weather adds nothing.</p></div>
@@ -244,12 +247,12 @@ export function Forecast({ all, lightning }) {
               <span><i className="fade-swatch"></i>Faded = outside model area</span>
             </div>
           </div>
-          <DayPanel ov={lightning} day={day} selected={selected} onSelect={select} forecast={f} />
+          <DayPanel ov={lightning} day={day} selected={selected} onSelect={select} forecast={f} quiet={quiet} />
         </div>
         <div className="split">
           <div className="card">
             <h3 className="h-sm">How it's made</h3>
-            <p className="muted">The model trained on gridMET weather, which runs about two days behind. So the last {f.open_meteo_days.length} day{f.open_meteo_days.length === 1 ? "" : "s"} before the forecast come from the Open-Meteo forecast instead, with rain averaged over five points in each area: storm rain is patchy, and one point mostly misses it.{f.storms ? " The model knows how dry each area is but not where storms will be, so each score is then adjusted by NOAA's HRRR storm forecast for the day: lightning, storm energy (CAPE) and rain." : " Tonight's HRRR storm forecast wasn't available, so this one goes out without it."} Issued {new Date(f.issued_at).toLocaleString("en-US", { timeZone: "America/Los_Angeles", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })} Pacific.</p>
+            <p className="muted">The model trained on gridMET weather, which runs about two days behind. So {f.open_meteo_days.length === 1 ? "the day before the forecast comes" : `the last ${f.open_meteo_days.length} days before the forecast come`} from the Open-Meteo forecast instead, with rain averaged over five points in each area: storm rain is patchy, and one point mostly misses it.{f.storms ? " The model knows how dry each area is but not where storms will be, so each score is then adjusted by NOAA's HRRR storm forecast for the day: lightning, storm energy (CAPE) and rain." : " Tonight's HRRR storm forecast wasn't available, so this one goes out without it."}</p>
           </div>
           <div className="card">
             <h3 className="h-sm">How much to trust it</h3>
@@ -276,11 +279,11 @@ function TrackRecord({ cells }) {
   const row = (label, s) => (
     <tr>
       <td>{label}</td>
-      <td>{s.days}</td>
+      <td className="opt">{s.days}</td>
       <td>{s.fire_cells}</td>
       <td><b>{s.recall == null ? "—" : `${pct(s.recall)} (${s.caught})`}</b></td>
       <td>{s.recall_history == null ? "—" : `${pct(s.recall_history)} (${s.caught_history})`}</td>
-      <td>{pct(t.random)}</td>
+      <td className="opt">{pct(t.random)}</td>
     </tr>
   );
   return (
@@ -288,11 +291,14 @@ function TrackRecord({ cells }) {
       <div className="section-head">
         <h3 className="h-sm">Track record</h3>
         <p className="muted">Every night, each past forecast is checked against the lightning fires reported since. A fire counts as caught when it starts in one of that day's {t.review_k} crew-list areas.</p>
+        {reconstructed.days > 0 && reconstructed.recall < reconstructed.recall_history && (
+          <p className="muted track-note">So far in 2026, fire history alone has caught more of these fires than the model. With a few dozen fires a season the numbers swing from year to year (in the 2024 replay the model came out ahead), so this record keeps running in the open. Closing that gap is the next piece of work.</p>
+        )}
       </div>
       <div className="card table-card">
         <table className="track-table">
           <thead>
-            <tr><th></th><th>Days</th><th>Lightning fire area-days</th><th>Caught by the model</th><th>By fire history alone</th><th>Random</th></tr>
+            <tr><th></th><th className="opt">Days</th><th>Lightning fire area-days</th><th>Caught by the model</th><th>By fire history alone</th><th className="opt">Random</th></tr>
           </thead>
           <tbody>
             {row(firstLive ? `Live, since ${fmtDay(firstLive, { month: "short", day: "numeric" })}` : "Live", live)}
@@ -307,12 +313,12 @@ function TrackRecord({ cells }) {
       {fireDays.length > 0 && (
         <div className="card table-card">
           <table className="track-table">
-            <thead><tr><th>Day</th><th>Lightning fires</th><th className="l">Where</th><th>Model's list</th><th>History's list</th></tr></thead>
+            <thead><tr><th>Day</th><th className="opt">Lightning fires</th><th className="l">Where</th><th>Model's list</th><th>History's list</th></tr></thead>
             <tbody>
               {fireDays.slice(0, 12).map((d) => (
                 <tr key={d.date}>
                   <td>{fmtDay(d.date, { month: "short", day: "numeric" })}{d.reconstructed ? "" : " · live"}</td>
-                  <td>{d.fires.length}</td>
+                  <td className="opt">{d.fires.length}</td>
                   <td className="l">{[...new Set(d.fires.map((f) => name(cells[f[2]].id)))].slice(0, 3).join(", ")}</td>
                   <td className={d.caught ? "up" : ""}>{d.caught} of {d.fire_cells}</td>
                   <td className={d.caught_history ? "up" : ""}>{d.caught_history} of {d.fire_cells}</td>
@@ -364,7 +370,7 @@ export function Limits({ lightning }) {
         </div>
         <div className="limits">
           <div className="card"><h3 className="h-sm">A ranking, not a probability</h3><p className="muted">Scores say which areas are riskier than others. They are not calibrated chances of fire.</p></div>
-          <div className="card"><h3 className="h-sm">Hindsight weather</h3><p className="muted">The weather data is compiled after the fact. Real forecasts are noisier, so a live version would likely do worse.</p></div>
+          <div className="card"><h3 className="h-sm">The replay uses hindsight weather</h3><p className="muted">The replay map scores past days with weather recorded after the fact. Real forecasts are noisier, so the live forecast keeps its own track record against them.</p></div>
           <div className="card"><h3 className="h-sm">Few lightning fires</h3><p className="muted">Only {nf.format(lightning.data.replay_fires)} lightning fires in the test years, many on a handful of storm days. The direction is solid; exact numbers are less certain.</p></div>
           <div className="card"><h3 className="h-sm">Cause records have gaps</h3><p className="muted">About 4 in 10 fires have no recorded cause. Some were surely lightning, so the lightning label misses some real ones.</p></div>
         </div>
@@ -505,7 +511,7 @@ export function Footer() {
   return (
     <footer className="footer">
       <div className="wrap">
-        <p><b>localhots</b> · started at IBM Z Datathon 2026</p>
+        <p><b>localhots</b> · built at IBM Z Datathon 2026 by {TEAM.slice(0, -1).join(", ")} and {TEAM.at(-1)}. Developed since by <a href={AUTHOR_URL}>Anuthrak Ratana</a>. <a href={CTA[0]}>Code on GitHub</a>.</p>
         <p className="tiny">{SOURCES}</p>
       </div>
     </footer>

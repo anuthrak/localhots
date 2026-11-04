@@ -1,7 +1,8 @@
 import { RISK, fires, fmtDay, name, pct, riskColor } from "../lib.js";
 
 // forecast: the live forecast's metadata; without it the panel describes a replay day and how it turned out.
-export default function DayPanel({ ov, day, selected, onSelect, forecast }) {
+// quiet: every score is below the map's first colour step, so the tags say "Low" rather than a row of 0.00s.
+export default function DayPanel({ ov, day, selected, onSelect, forecast, quiet = false }) {
   if (!day) {
     return (
       <aside className="panel">
@@ -19,7 +20,9 @@ export default function DayPanel({ ov, day, selected, onSelect, forecast }) {
   return (
     <aside className="panel" aria-live="polite">
       <div className="card day-card">
-        <p className="eyebrow">{forecast ? "Forecast" : "Outlook"} issued evening of {fmtDay(day.issued, { weekday: "short", month: "short", day: "numeric" })}</p>
+        <p className="eyebrow">{forecast
+          ? `Forecast issued ${new Date(forecast.issued_at).toLocaleString("en-US", { timeZone: "America/Los_Angeles", weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })} Pacific`
+          : `Outlook issued evening of ${fmtDay(day.issued, { weekday: "short", month: "short", day: "numeric" })}`}</p>
         <h3>{fmtDay(day.date, { weekday: "long", month: "long", day: "numeric", year: "numeric" })}</h3>
         {forecast ? (
           <p className="small muted">Weather: gridMET through {fmtDay(forecast.gridmet_through, { month: "short", day: "numeric" })}, then the Open-Meteo forecast. Scored by the lightning model each evening.</p>
@@ -47,7 +50,7 @@ export default function DayPanel({ ov, day, selected, onSelect, forecast }) {
           <button key={c.id} className={`watch-item${selected === c.id ? " active" : ""}`} onClick={() => onSelect(c.id)}>
             <span className="rank-badge">{c.rank}</span>
             <span className="name">{name(c.id)}</span>
-            <span className="score" style={{ background: riskColor(c.score * scale), color: c.score * scale >= RISK[2] ? "#fff" : "#111" }}>{c.score.toFixed(2)}</span>
+            <span className="score" title={`score ${c.score.toFixed(3)}`} style={{ background: riskColor(c.score * scale), color: c.score * scale >= RISK[2] ? "#fff" : "#111" }}>{quiet ? "Low" : c.score.toFixed(2)}</span>
             <ul>{(c.reasons.length ? c.reasons : ["Ranked high mostly on its fire history for this month"]).map((r) => <li key={r}>{r}</li>)}</ul>
             {!forecast && <span className={`result ${c.fires ? "hit" : "miss"}`}>{c.fires ? `${fires(c.fires)} discovered here` : "No fire recorded here"}</span>}
           </button>

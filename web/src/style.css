@@ -46,7 +46,7 @@ b { font-weight: 600; }
 
 /* Nav */
 .nav {
-  position: sticky; top: 0; z-index: 1000;
+  position: sticky; top: 0; z-index: 1100; /* above Leaflet's controls (1000) */
   background: rgba(255, 255, 255, 0.82);
   backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
   border-bottom: 1px solid var(--hairline);
@@ -96,7 +96,11 @@ b { font-weight: 600; }
 }
 .lede { max-width: 720px; font-size: 17px; line-height: 1.6; color: #2b2a29; }
 .hero-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px; }
-.hero-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin: 48px 0 0; }
+.track-note { margin-top: 10px; }
+.byline { margin-top: 18px; font-size: 14px; color: var(--ash); }
+.byline a, .footer a { text-underline-offset: 3px; }
+.byline a { color: var(--ink); }
+.hero-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin: 40px 0 0; }
 .hero-stats div { background: rgba(255, 255, 255, 0.72); border-radius: var(--r-card); padding: 16px 18px; }
 .hero-stats dt { font-size: 13px; line-height: 1.35; color: var(--ash); margin-bottom: 6px; }
 .hero-stats dd { margin: 0; font-size: 26px; letter-spacing: -0.03em; }
@@ -313,6 +317,11 @@ b { font-weight: 600; }
   .hero { padding: 48px 0 40px; }
   .hero-stats { margin-top: 36px; }
   .hero-stats dd { font-size: 21px; }
+  /* Keep the model-vs-history columns on screen; days, random and fire counts are side detail. */
+  .track-table { min-width: 0; font-size: 14px; }
+  .track-table th, .track-table td { padding: 10px 6px; }
+  .track-table .opt { display: none; }
+  .track-table td:first-child { white-space: nowrap; }
   .section { padding: 56px 0; }
   .section-head { margin-bottom: 24px; }
   .section-head h2, .forecast h2 { font-size: 30px; line-height: 1.1; letter-spacing: -0.03em; }

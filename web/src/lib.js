@@ -12,8 +12,29 @@ export const RISK = [0.05, 0.12, 0.2463, 0.4]; // ramp breaks; 0.2463 is the mod
 const RISK_COLORS = ["#fff7cc", "#ffef99", "#ffb35c", "#e8400d", "#af1e00"];
 
 let cellNames = NAMES;
-// Pages whose cells carry their own names (overview.cells[].name) register them here.
-export const setCellNames = (cells) => { cellNames = Object.fromEntries(cells.map((c) => [c.id, c.name])); };
+const COMPASS = ["east", "northeast", "north", "northwest", "west", "southwest", "south", "southeast"];
+
+// Pages whose cells carry their own names (overview.cells[].name) register them here. Several areas
+// can share the nearest town; those get the direction from their group's middle, e.g. "Near Ruth (west)".
+export const setCellNames = (cells) => {
+  const groups = {};
+  for (const c of cells) (groups[c.name] ??= []).push(c);
+  cellNames = {};
+  for (const [label, group] of Object.entries(groups)) {
+    if (group.length === 1) { cellNames[group[0].id] = label; continue; }
+    const mid = (c) => [(c.bounds[0][0] + c.bounds[1][0]) / 2, (c.bounds[0][1] + c.bounds[1][1]) / 2];
+    const lat = group.reduce((s, c) => s + mid(c)[0], 0) / group.length;
+    const lon = group.reduce((s, c) => s + mid(c)[1], 0) / group.length;
+    const seen = {};
+    for (const c of group) {
+      const [y, x] = mid(c);
+      let dir = Math.hypot(y - lat, x - lon) < 1e-6 ? "middle" : COMPASS[Math.round((Math.atan2(y - lat, x - lon) * 4) / Math.PI + 8) % 8];
+      seen[dir] = (seen[dir] ?? 0) + 1;
+      if (seen[dir] > 1) dir += ` ${seen[dir]}`;
+      cellNames[c.id] = `${label} (${dir})`;
+    }
+  }
+};
 
 export const nf = new Intl.NumberFormat("en-US");
 export const pct = (v, d = 0) => `${(v * 100).toFixed(d)}%`;
