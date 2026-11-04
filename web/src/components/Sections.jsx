@@ -505,14 +505,37 @@ function DetailsBody({ all, lightning, base }) {
   );
 }
 
-const SOURCES = "Fire data: US Forest Service, Fire Program Analysis Fire-Occurrence Database (FPA FOD), 7th edition. Weather: gridMET (University of California Merced / Climatology Lab); the datathon model used Open-Meteo / Copernicus ERA5, CC BY 4.0. Place names: US Census Bureau Gazetteer. Map tiles © OpenStreetMap contributors. Research model, not an official warning service.";
+const SOURCES = [
+  "Fires: US Forest Service FPA FOD, 7th ed.",
+  "Weather: gridMET (UC Merced Climatology Lab); datathon model: Open-Meteo / Copernicus ERA5, CC BY 4.0",
+  "Lightning fires: NIFC WFIGS",
+  "Place names: US Census Gazetteer",
+  "Map tiles © OpenStreetMap contributors",
+];
 
 export function Footer() {
   return (
     <footer className="footer">
-      <div className="wrap">
-        <p><b>localhots</b> · built at IBM Z Datathon 2026 by {TEAM.slice(0, -1).join(", ")} and {TEAM.at(-1)}. Developed since by <a href={AUTHOR_URL}>Anuthrak Ratana</a>. <a href={CTA[0]}>Code on GitHub</a>.</p>
-        <p className="tiny">{SOURCES}</p>
+      <div className="wrap footer-top">
+        <div className="footer-brand">
+          <a href="#top" className="logo"><span className="flame" aria-hidden="true"></span>localhots</a>
+          <p>Where the next Northern California wildfire is likely to start. A research model, not an official warning service.</p>
+        </div>
+        <div className="footer-col">
+          <h4>Team · IBM Z Datathon 2026</h4>
+          <ul>{TEAM.map((n) => <li key={n}>{n === "Anuthrak Ratana" ? <><a href={AUTHOR_URL}>{n}</a> <span className="footer-note">· maintainer</span></> : n}</li>)}</ul>
+        </div>
+        <div className="footer-col">
+          <h4>Project</h4>
+          <ul>
+            <li><a href={CTA[0]}>Code on GitHub</a></li>
+            <li><a href="#forecast">Live forecast</a></li>
+            <li><a href="#details">Technical details</a></li>
+          </ul>
+        </div>
+      </div>
+      <div className="wrap footer-fine">
+        <p>{SOURCES.join(" · ")}</p>
       </div>
     </footer>
   );
